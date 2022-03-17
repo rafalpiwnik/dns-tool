@@ -1,3 +1,4 @@
+import binascii
 from enum import Enum
 
 
@@ -78,8 +79,9 @@ def build_header(num_questions: int = 0):
     NSCOUNT = 0
     ARCOUNT = 0
 
+    # Hard to read and debug
     params = f"{QR}{str(OPCODE).zfill(4)}{AA}{TC}{RD}{RA}{str(Z).zfill(3)}{str(RCODE).zfill(4)}"
-    header = f"{ID:04x}{params}{QDCOUNT:04x}{ANCOUNT:04x}{NSCOUNT:04x}{ARCOUNT:04x}"
+    header = f"{ID:04x}{int(params, 2):04x}{QDCOUNT:04x}{ANCOUNT:04x}{NSCOUNT:04x}{ARCOUNT:04x}"
 
     return header
 
@@ -94,10 +96,13 @@ def build_header(num_questions: int = 0):
 # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 # |                     QCLASS                    |
 # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-def build_question(name: str, QTYPE: Type):
+def build_question(name: str, QTYPE: Type = Type.A):
     """name - e.g. cs.berkeley.edu"""
     QNAME = ""
     labels = name.split(".")
     for label in labels:
-        length = len(label)
-        QNAME += f"{length:02x}"
+        address_hex = binascii.hexlify(label.encode()).decode()
+        QNAME += f"{len(label ):02x}{address_hex}"
+    QNAME += "00"
+
+    return QNAME
