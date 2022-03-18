@@ -210,12 +210,17 @@ class DnsQuestion:
 
     def build(self):
         QNAME = ""
+        if self.name == ".":
+            self.name = ""
+
         labels = self.name.split(".")
         for label in labels:
             address_hex = binascii.hexlify(label.encode()).decode()
             QNAME += f"{len(label):02x}{address_hex}"
-        if len(labels) > 1:     # Fixes query for "" root
+
+        if not (len(labels) == 1 and labels[0] == ""):  # Fixes query for "" root
             QNAME += "00"
+
         message = f"{QNAME}{self.qtype.value:04x}{self.qclass.value:04x}"
         return message
 

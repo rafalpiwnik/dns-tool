@@ -13,13 +13,16 @@ if __name__ == "__main__":
     header = DnsHeader(qdcount=1)
     q1 = DnsQuestion(name="cs.berkeley.edu", qtype=QType.A)
 
-    # Query for root NS needs OPT
-    q2 = DnsQuestion(name="", qtype=QType.NS, qclass=QClass.IN)
+    # OPT needed for query for NS . - why, payload size?
+
+    q2 = DnsQuestion(name="com", qtype=QType.NS, qclass=QClass.IN)
+    q3 = DnsQuestion(name="edu.pl", qtype=QType.NS, qclass=QClass.IN)
+    q4 = DnsQuestion(name="i-dns.pl", qtype=QType.A, qclass=QClass.IN)
 
     # Build message
     message = DnsMessage()
     message.header = header
-    message.question = [q2]
+    message.question = [q4]
 
     built_message = binascii.unhexlify(message.build())
 
