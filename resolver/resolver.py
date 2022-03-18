@@ -1,10 +1,14 @@
 import binascii
+import ipaddress
 import time
 from dataclasses import dataclass, field
+from datetime import timedelta
 from enum import Enum
 
-
 # Resource record TYPES as per RFC1035 + AAAA
+from typing import Union
+
+
 class QType(Enum):
     A = 1
     NS = 2
@@ -186,6 +190,21 @@ class DnsHeader:
                f"\tAdditional RRs: {self.arcount}"
 
 
+def to_qname(domain_name):
+    qname = ""
+    domain_name = domain_name.rstrip(".")  # Remove trailing '.'
+
+    labels = domain_name.split(".")
+    for label in labels:
+        address_hex = binascii.hexlify(label.encode()).decode()
+        qname += f"{len(label):02x}{address_hex}"
+
+    if not (len(labels) == 1 and labels[0] == ""):  # Fixes query for "" root
+        qname += "00"
+
+    return qname
+
+
 #   0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
 # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 # |                                               |
@@ -209,23 +228,16 @@ class DnsQuestion:
         return self
 
     def build(self):
-        QNAME = ""
-        if self.name == ".":
-            self.name = ""
-
-        labels = self.name.split(".")
-        for label in labels:
-            address_hex = binascii.hexlify(label.encode()).decode()
-            QNAME += f"{len(label):02x}{address_hex}"
-
-        if not (len(labels) == 1 and labels[0] == ""):  # Fixes query for "" root
-            QNAME += "00"
-
+        QNAME = to_qname(self.name)
         message = f"{QNAME}{self.qtype.value:04x}{self.qclass.value:04x}"
         return message
 
+    def fqdn(self):
+        """Fully qualified domain name"""
+        return f"{self.name}."
+
     def __repr__(self):
-        return f"{'<Root>' if not self.name else self.name}: type: {self.qtype}, class: {self.qclass}"
+        return f"{self.fqdn()}: type: {self.qtype}, class: {self.qclass}"
 
     def __str__(self):
         return f"\tName: {'.' if self.name == '' else self.name}\n" \
@@ -235,22 +247,58 @@ class DnsQuestion:
 
 @dataclass
 class RData:
+    """Base class for storing and interpreting different DNS RRs types
+    data MUST hold a hex stream, no other representation is valid"""
     data: str  # Hex stream
 
     def __repr__(self):
         return self.data
 
+    def __str__(self):
+        return self.data
+
+
+class OPTRecord(RData):
+    pass
+
 
 class ARecord(RData):
-    def __repr__(self):
-        return f"{int(self.data[:2], 16)}.{int(self.data[2:4], 16)}.{int(self.data[4:6], 16)}.{int(self.data[6:], 16)}"
+    def __str__(self):
+        addr = ipaddress.ip_address(
+            f"{int(self.data[:2], 16)}.{int(self.data[2:4], 16)}.{int(self.data[4:6], 16)}.{int(self.data[6:], 16)}")
+        return str(addr)
 
 
 class NSRecord(RData):
-    data: str
-
     def __init__(self, bb: ByteBuffer):
         self.data = bb.read_qname()
+
+
+# The same logic, different name, merge?
+class MXRecord(RData):
+    def __init__(self, bb: ByteBuffer):
+        self.data = bb.read_qname()
+
+
+class AAAARecord(RData):
+    def __str__(self):
+        raw_addr = ":".join((self.data[i:i + 4]) for i in range(0, len(self.data), 4))
+        addr = ipaddress.ip_address(raw_addr)
+        return str(addr)
+
+
+# +------------+--------------+------------------------------+
+# | Field Name | Field Type   | Description                  |
+# +------------+--------------+------------------------------+
+# | NAME       | domain name  | MUST be 0 (root domain)      |
+# | TYPE       | u_int16_t    | OPT (41)                     |
+# | CLASS      | u_int16_t    | requestor's UDP payload size |
+# | TTL        | u_int32_t    | extended RCODE and flags     |
+# | RDLEN      | u_int16_t    | length of all RDATA          |
+# | RDATA      | octet stream | {attribute,value} pairs      |
+# +------------+--------------+------------------------------+
+#
+#                         OPT RR Format
 
 
 # 0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
@@ -276,7 +324,7 @@ class NSRecord(RData):
 class DnsResourceRecord:
     name: str = "."
     qtype: QType = None
-    qclass: QClass = None
+    qclass: Union[QClass, int] = None  # Can be either class or UDP payload size when using OP pseudo-RR
     ttl: int = 0
     rdlength: int = 0  # Length of RDATA in octets
     rdata: RData = RData("")
@@ -284,27 +332,51 @@ class DnsResourceRecord:
     def from_buffer(self, bb: ByteBuffer):
         self.name = bb.read_qname()
         self.qtype = QType(bb.read_uint16())
-        self.qclass = QClass(bb.read_uint16())
+
+        # OPT pseudo RR -> QClass parsed as plain int as it represents UDP payload size
+        qclass_value = bb.read_uint16()
+        if self.qtype == QType.OPT:
+            self.qclass = qclass_value
+        else:
+            self.qclass = QClass(qclass_value)
+
         self.ttl = bb.read_uint32()
         self.rdlength = bb.read_uint16()
-        # NOTE
-        # RDATA - format varies accoring to qtype, qclass - should be parsed differently
-        # e.g. NS -> a-dns.pl but A -> 192.42.39.11
-        # Name can be compressed and replaced with pointer
 
         if self.qtype == QType.A:
             self.rdata = ARecord(bb.read_plain(self.rdlength))
         elif self.qtype == QType.NS:
             self.rdata = NSRecord(bb)
+        elif self.qtype == QType.AAAA:
+            self.rdata = AAAARecord(bb.read_plain(self.rdlength))
+        elif self.qtype == QType.MX:
+            self.rdata = MXRecord(bb)
+        elif self.qtype == QType.OPT:
+            self.rdata = OPTRecord(bb.read_plain(self.rdlength))
         else:
-            # Cannot double read !
             self.rdata = RData(bb.read_plain(self.rdlength))
 
         return self
 
-    # TODO: returns wrong data for smaller ttl values
+    def build(self):
+        qname = to_qname(self.name)
+        qclass_value = self.qclass_value()
+        return f"{qname}{self.qtype.value:04x}{qclass_value:04x}{self.ttl:08x}{self.rdlength:04x}{self.rdata.data}"
+
+    def pseudo_record(self, domain_name: str, udp_payload_size: int):
+        self.name = domain_name
+        self.qtype = QType.OPT
+        self.qclass = udp_payload_size
+        self.ttl = 0
+        self.rdlength = 0
+        self.rdata = RData(data="")
+        return self
+
+    def qclass_value(self):
+        return self.qclass.value if isinstance(self.qclass, QClass) else self.qclass
+
     def readable_ttl(self):
-        return time.strftime("%d days, %H hours, %M minutes, %S seconds", time.gmtime(self.ttl))
+        return str(timedelta(seconds=self.ttl))
 
     def __repr__(self):
         result = f"{self.name}:" if len(self.name) > 0 else "<Root>:"
@@ -316,7 +388,7 @@ class DnsResourceRecord:
     def __str__(self):
         return f"\tName: {'.' if self.name == '' else self.name}\n" \
                f"\tType: {self.qtype.name}\n" \
-               f"\tClass: {self.qclass.name}\n" \
+               f"\tClass: {self.qclass.name if isinstance(self.qclass, QClass) else self.qclass}\n" \
                f"\tTime to live: {self.ttl} ({self.readable_ttl()})\n" \
                f"\tData length: {self.rdlength}\n" \
                f"\tData: {self.rdata}\n\n"
@@ -354,20 +426,26 @@ class DnsMessage:
             auth_ns = DnsResourceRecord().from_buffer(bb)
             self.authority.append(auth_ns)
         for _ in range(self.header.arcount):
-            pass
             # NOTE: Not implemented due to OPT Qtype not having QClass and different layout in general
-            # additional_r = DnsResourceRecord().from_buffer(bb)
-            # self.additional.append(additional_r)
+            additional_r = DnsResourceRecord().from_buffer(bb)
+            self.additional.append(additional_r)
         bb.pos = 0  # Reset cursor @ buffer
         return self
 
     def build(self):
         message = self.header.build()
+        # TODO can be compressed due to the same build interface
         for q in self.question:
             message += q.build()
-        if len(self.authority) > 0 or len(self.additional) > 0 or len(self.answer) > 0:
-            raise NotImplementedError("Cannot build message with answer, authority or additional sections")
-        return message
+        for ans in self.answer:
+            message += ans.build()
+        for auth in self.authority:
+            message += auth.build()
+        for ar in self.additional:
+            message += ar.build()
+        # if len(self.authority) > 0 or len(self.additional) > 0 or len(self.answer) > 0:
+        #     raise NotImplementedError("Cannot build message with answer, authority or additional sections")
+        return binascii.unhexlify(message)
 
     def __repr__(self):
         return f"DNS Message: {repr(self.header)}"

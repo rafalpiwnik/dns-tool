@@ -71,7 +71,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(QClass.IN, record_a.qclass)
         self.assertEqual(557760, record_a.ttl)
         self.assertEqual(4, record_a.rdlength)
-        self.assertEqual("198.97.190.53", record_a.rdata.__repr__())
+        self.assertEqual("198.97.190.53", str(record_a.rdata))
 
     def test_read_header_manual(self):
         bb = ByteBuffer(buf=bytes.fromhex(RESPONSE_NS_ROOT))
@@ -129,10 +129,6 @@ class MyTestCase(unittest.TestCase):
         question = DnsQuestion().from_buffer(bb)
         message = question.build()
         self.assertEqual(QUERY_A_BERKELEY, message)
-
-    def test_dnsmessage_from_buffer(self):
-        bb = ByteBuffer(buf=bytes.fromhex(RESPONSE_NS_ROOT))
-        message = DnsMessage().from_buffer(bb)
 
 
 if __name__ == '__main__':
