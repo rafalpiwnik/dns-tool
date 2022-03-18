@@ -214,7 +214,8 @@ class DnsQuestion:
         for label in labels:
             address_hex = binascii.hexlify(label.encode()).decode()
             QNAME += f"{len(label):02x}{address_hex}"
-        QNAME += "00"
+        if len(labels) > 1:     # Fixes query for "" root
+            QNAME += "00"
         message = f"{QNAME}{self.qtype.value:04x}{self.qclass.value:04x}"
         return message
 
@@ -296,6 +297,7 @@ class DnsResourceRecord:
 
         return self
 
+    # TODO: returns wrong data for smaller ttl values
     def readable_ttl(self):
         return time.strftime("%d days, %H hours, %M minutes, %S seconds", time.gmtime(self.ttl))
 
@@ -353,6 +355,17 @@ class DnsMessage:
             # self.additional.append(additional_r)
         bb.pos = 0  # Reset cursor @ buffer
         return self
+
+    def build(self):
+        message = self.header.build()
+        for q in self.question:
+            message += q.build()
+        if len(self.authority) > 0 or len(self.additional) > 0 or len(self.answer) > 0:
+            raise NotImplementedError("Cannot build message with answer, authority or additional sections")
+        return message
+
+    def __repr__(self):
+        return f"DNS Message: {repr(self.header)}"
 
     # NOTE: appending to string stringbuilder?, performance?
     def __str__(self):
