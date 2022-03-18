@@ -79,13 +79,21 @@ class ByteBuffer:
         self.pos += 1
         return result
 
+    def peek_uint16(self):
+        return int.from_bytes(self.buf[self.pos:self.pos + 2], byteorder="big", signed=False)
+
     def read_uint16(self):
-        result = int.from_bytes(self.buf[self.pos:self.pos + 2], byteorder="big", signed=False)
+        result = self.peek_uint16()
         self.pos += 2
         return result
 
-    def peek_uint16(self):
-        return int.from_bytes(self.buf[self.pos:self.pos + 2], byteorder="big", signed=False)
+    def peek_uint32(self):
+        return int.from_bytes(self.buf[self.pos:self.pos + 4], byteorder="big", signed=False)
+
+    def read_uint32(self):
+        result = self.peek_uint32()
+        self.pos += 4
+        return result
 
     def read_qname(self):
         result: list[str] = []
@@ -202,6 +210,46 @@ class DnsQuestion:
         QNAME += "00"
         message = f"{QNAME}{self.qtype.value:04x}{self.qclass.value:04x}"
         return message
+
+
+#   0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+# |                                               |
+# /                                               /
+# /                      NAME                     /
+# |                                               |
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+# |                      TYPE                     |
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+# |                     CLASS                     |
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+# |                      TTL                      |
+# |                                               |
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+# |                   RDLENGTH                    |
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--|
+# /                     RDATA                     /
+# /                                               /
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+@dataclass
+class DnsResourceRecord:
+    name: str = "."
+    qtype: QType = QType.A
+    qclass: QClass = QClass.IN
+    ttl: int = 0
+    rdlength: int = 0
+    rdata: str = ""
+
+    def from_buffer(self, bb: ByteBuffer):
+        self.name = bb.read_qname()
+        self.qtype = QType(bb.read_uint16())
+        self.qclass = QClass(bb.read_uint16())
+        self.ttl = bb.read_uint32()
+        self.rdlength = bb.read_uint16()
+        # NOTE
+        # RDATA - format varies accoring to qtype, qclass - should be parsed differently
+        # e.g. NS -> a-dns.pl but A -> 192.42.39.11
+        # Name can be compressed and replaced with pointer
 
 
 def build_header(num_questions: int = 0):
