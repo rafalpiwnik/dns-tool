@@ -28,14 +28,45 @@ RESPONSE_NS_ROOT = "1b9d81800001000e0000001a0000020001000002000100070bf200140166
 
 QUERY_A_BERKELEY = "026373086265726b656c6579036564750000010001"
 
+RESPONSE_DNS_FRAME_A_WITH_JUMP = "08758180000100010000000001680c726f6f742d73657276657273036e65740000010001c00c0" \
+                                 "0010001000882c00004c661be35"
+
 RR_A_WITH_JUMP__ = "c00c00010001000882c00004c661be35"
 
 
 class MyTestCase(unittest.TestCase):
+    def test_read_plain(self):
+        bb = ByteBuffer(buf=bytes.fromhex("026373086265726b656c65790365647500"))
+        actual = bb.read_plain(4)
+        expected = "02637308"
+        self.assertEqual(expected, actual)
+
     def test_read_qname(self):
         bb = ByteBuffer(buf=bytes.fromhex("026373086265726b656c65790365647500"))
         self.assertEqual(bb.read_qname(), "cs.berkeley.edu")
         self.assertEqual(bb.pos, len(bb.buf))
+
+    def test_read_qname_jump_dnsrecord(self):
+        bb = ByteBuffer(buf=bytes.fromhex(RESPONSE_DNS_FRAME_A_WITH_JUMP))
+        expected = "h.root-servers.net"
+        _ = DnsHeader().from_buffer(bb)  # Skip and discard header
+
+        question = DnsQuestion().from_buffer(bb)
+        actual_no_jump = question.name
+
+        record_a = DnsResourceRecord().from_buffer(bb)
+        actual_with_jump = record_a.name
+
+        # Name without and with jump:
+        self.assertEqual(expected, actual_no_jump)
+        self.assertEqual(expected, actual_with_jump)
+
+        # DNS RR correctness
+        self.assertEqual(QType.A, record_a.qtype)
+        self.assertEqual(QClass.IN, record_a.qclass)
+        self.assertEqual(557760, record_a.ttl)
+        self.assertEqual(4, record_a.rdlength)
+        self.assertEqual("198.97.190.53", record_a.rdata.__repr__())
 
     def test_read_header_manual(self):
         bb = ByteBuffer(buf=bytes.fromhex(RESPONSE_NS_ROOT))
@@ -93,16 +124,6 @@ class MyTestCase(unittest.TestCase):
         question = DnsQuestion().from_buffer(bb)
         message = question.build()
         self.assertEqual(QUERY_A_BERKELEY, message)
-
-    def test_dnsrecord(self):
-        bb = ByteBuffer(buf=bytes.fromhex(RR_A))
-        rr = DnsResourceRecord().from_buffer(bb)
-        self.assertEqual("h.root-servers.net", rr.name)
-        self.assertEqual(QType.A, rr.qtype)
-        self.assertEqual(QClass.IN, rr.qclass)
-        self.assertEqual(557760, rr.ttl)
-        self.assertEqual(4, rr.rdlength)
-        self.assertEqual("192.97.190.53", rr.__repr__())
 
 
 if __name__ == '__main__':

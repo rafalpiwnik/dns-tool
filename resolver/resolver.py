@@ -89,30 +89,48 @@ class ByteBuffer:
         return result
 
     def peek_uint32(self):
-        return int.from_bytes(self.buf[self.pos:self.pos + 4], byteorder="big", signed=False)
+        part = self.buf[self.pos:self.pos + 4]
+        return int.from_bytes(part, byteorder="big", signed=False)
 
     def read_uint32(self):
         result = self.peek_uint32()
         self.pos += 4
         return result
 
-    # TODO - really should throw bufferoutofbounds
     def read_plain(self, num_bytes: int):
-        result = self.buf[self.pos:self.pos + num_bytes]
+        # Would be easier without converting to hex stream, maybe change?
+        result = self.buf[self.pos:self.pos + num_bytes].hex()
         self.pos += num_bytes
         return result
 
-    # TODO - there can be jumps (ptrs) represented by 0x0c
+    # Jumps implemented but not error safe (loop jumps?)
     def read_qname(self):
         result: list[str] = []
+        has_jumped = False
+        pos_return = -1
+
         label_length = self.buf[self.pos]
         while label_length > 0:
             self.pos += 1
-            label = self.buf[self.pos:self.pos + label_length].decode()
-            result.append(label)
-            self.pos += label_length
+            if (label_length & 0xC0) == 0xC0:
+                if not has_jumped:
+                    pos_return = self.pos + 1
+                offset1 = label_length
+                offset2 = self.buf[self.pos]
+                pos_target = ((offset1 ^ 0xC0) << 8) | offset2
+                self.pos = pos_target
+                has_jumped = True
+            else:
+                label = self.buf[self.pos:self.pos + label_length].decode()
+                result.append(label)
+                self.pos += label_length
             label_length = self.buf[self.pos]
-        self.pos += 1
+
+        if has_jumped:
+            self.pos = pos_return
+        else:
+            self.pos += 1
+
         return ".".join(result)
 
 
@@ -222,7 +240,7 @@ class DnsQuestion:
 
 @dataclass
 class RData:
-    data: str = ""  # Hex stream
+    data: str  # Hex stream
 
     def __repr__(self):
         return self.data
@@ -255,8 +273,8 @@ class ARecord(RData):
 @dataclass
 class DnsResourceRecord:
     name: str = "."
-    qtype: QType = QType.A
-    qclass: QClass = QClass.IN
+    qtype: QType = None
+    qclass: QClass = None
     ttl: int = 0
     rdlength: int = 0  # Length of RDATA in octets
     rdata: RData = RData("")
