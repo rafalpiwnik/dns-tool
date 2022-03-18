@@ -7,7 +7,7 @@ import numpy as np
 # Resource record TYPES as per RFC1035 + some others
 
 
-class Type(Enum):
+class QType(Enum):
     A = 1
     NS = 2
     MD = 3
@@ -24,6 +24,10 @@ class Type(Enum):
     MX = 15
     TXT = 16
     AAAA = 28
+
+
+class QClass(Enum):
+    IN = 1
 
 
 TYPES: dict[str, int] = {
@@ -92,6 +96,7 @@ class ByteBuffer:
             result.append(label)
             self.pos += label_length
             label_length = self.buf[self.pos]
+        self.pos += 1
         return ".".join(result)
 
 
@@ -166,11 +171,37 @@ class DnsHeader:
         self.response_code = RCode(int(bin_repr[15]))
 
 
+#   0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+# |                                               |
+# /                     QNAME                     /
+# /                                               /
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+# |                     QTYPE                     |
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+# |                     QCLASS                    |
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 @dataclass
 class DnsQuestion:
-    qname: str  # yahoo.com. -> encoded
-    qtype: Type  # A
-    qclass: np.uint16 = 1  # Class IN
+    name: str = "."
+    qtype: QType = QType.A
+    qclass: QClass = QClass.IN
+
+    def from_buffer(self, bb: ByteBuffer):
+        self.name = bb.read_qname()
+        self.qtype = QType(bb.read_uint16())
+        self.qclass = QClass(bb.read_uint16())
+        return self
+
+    def build(self):
+        QNAME = ""
+        labels = self.name.split(".")
+        for label in labels:
+            address_hex = binascii.hexlify(label.encode()).decode()
+            QNAME += f"{len(label):02x}{address_hex}"
+        QNAME += "00"
+        message = f"{QNAME}{self.qtype.value:04x}{self.qclass.value:04x}"
+        return message
 
 
 def build_header(num_questions: int = 0):
@@ -197,17 +228,7 @@ def build_header(num_questions: int = 0):
     return header
 
 
-#   0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
-# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-# |                                               |
-# /                     QNAME                     /
-# /                                               /
-# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-# |                     QTYPE                     |
-# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-# |                     QCLASS                    |
-# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-def build_question(name: str, QTYPE: Type = Type.A):
+def build_question(name: str, QTYPE: QType = QType.A):
     """name - e.g. cs.berkeley.edu"""
     QNAME = ""
     labels = name.split(".")

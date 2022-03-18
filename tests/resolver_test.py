@@ -1,6 +1,6 @@
 import unittest
 
-from resolver.resolver import ByteBuffer, DnsHeader, RCode
+from resolver.resolver import ByteBuffer, DnsHeader, RCode, DnsQuestion, QType, QClass
 
 RESPONSE_NS_ROOT = "1b9d81800001000e0000001a0000020001000002000100070bf2001401660c726f6f742d73657276657273036e657400" \
                    "000002000100070bf200040163c01e000002000100070bf20004016ac01e000002000100070bf20004016dc01e000002" \
@@ -26,11 +26,14 @@ RESPONSE_NS_ROOT = "1b9d81800001000e0000001a0000020001000002000100070bf200140166
                    "000000000053c0d10001000100089b130004c0702404c0d1001c000100088d1400102001050000120000000000000000" \
                    "0d0d0000290200000080000000"
 
+QUERY_A_BERKELEY = "026373086265726b656c6579036564750000010001"
+
 
 class MyTestCase(unittest.TestCase):
     def test_read_qname(self):
         bb = ByteBuffer(buf=bytes.fromhex("026373086265726b656c65790365647500"))
         self.assertEqual(bb.read_qname(), "cs.berkeley.edu")
+        self.assertEqual(bb.pos, len(bb.buf))
 
     def test_read_header_manual(self):
         bb = ByteBuffer(buf=bytes.fromhex(RESPONSE_NS_ROOT))
@@ -75,6 +78,19 @@ class MyTestCase(unittest.TestCase):
         header = DnsHeader().from_buffer(bb)
         message = header.build()
         self.assertEqual("1b9d81800001000e0000001a", message)
+
+    def test_read_question(self):
+        bb = ByteBuffer(buf=bytes.fromhex(QUERY_A_BERKELEY))
+        question = DnsQuestion().from_buffer(bb)
+        self.assertEqual("cs.berkeley.edu", question.name)
+        self.assertEqual(QType.A, question.qtype)
+        self.assertEqual(QClass.IN, question.qclass)
+
+    def test_question_rebuild(self):
+        bb = ByteBuffer(buf=bytes.fromhex(QUERY_A_BERKELEY))
+        question = DnsQuestion().from_buffer(bb)
+        message = question.build()
+        self.assertEqual(QUERY_A_BERKELEY, message)
 
 
 if __name__ == '__main__':
