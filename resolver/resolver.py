@@ -2,12 +2,9 @@ import binascii
 import time
 from dataclasses import dataclass
 from enum import Enum
-import numpy as np
 
 
-# Resource record TYPES as per RFC1035 + some others
-
-
+# Resource record TYPES as per RFC1035 + AAAA
 class QType(Enum):
     A = 1
     NS = 2
@@ -29,32 +26,6 @@ class QType(Enum):
 
 class QClass(Enum):
     IN = 1
-
-
-TYPES: dict[str, int] = {
-    "A": 1,
-    "NS": 2,
-    "MD": 3,
-    "MF": 4,
-    "CNAME": 5,
-    "SOA": 6,
-    "MB": 7,
-    "MR": 9,
-    "NULL": 10,
-    "WKS": 11,
-    "PTR": 12,
-    "HINFO": 13,
-    "MINFO": 14,
-    "MX": 15,
-    "TXT": 16,
-    "AAAA": 28,
-    "CAA": 257,
-    "DNSKEY": 48,
-    "DS": 43,
-    "SRV": 33,
-    "TLSA": 52,
-    "TSIG": 250
-}
 
 
 class RCode(Enum):
