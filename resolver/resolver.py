@@ -218,6 +218,14 @@ class DnsQuestion:
         message = f"{QNAME}{self.qtype.value:04x}{self.qclass.value:04x}"
         return message
 
+    def __repr__(self):
+        return f"{'<Root>' if not self.name else self.name}: type: {self.qtype}, class: {self.qclass}"
+
+    def __str__(self):
+        return f"\tName: {'.' if self.name == '' else self.name}\n" \
+               f"\tType: {self.qtype.name}\n" \
+               f"\tClass: {self.qclass.name}\n"
+
 
 @dataclass
 class RData:
@@ -289,7 +297,7 @@ class DnsResourceRecord:
         return self
 
     def readable_ttl(self):
-        return time.strftime("%H:%M:%S", time.gmtime(self.ttl))
+        return time.strftime("%d days, %H hours, %M minutes, %S seconds", time.gmtime(self.ttl))
 
     def __repr__(self):
         result = f"{self.name}:" if len(self.name) > 0 else "<Root>:"
@@ -297,6 +305,14 @@ class DnsResourceRecord:
         result += f" class: {self.qclass}"
         result += f" data: {self.rdata}"
         return result
+
+    def __str__(self):
+        return f"\tName: {'.' if self.name == '' else self.name}\n" \
+               f"\tType: {self.qtype.name}\n" \
+               f"\tClass: {self.qclass.name}\n" \
+               f"\tTime to live: {self.ttl} ({self.readable_ttl()})\n" \
+               f"\tData length: {self.rdlength}\n" \
+               f"\tData: {self.rdata}\n\n"
 
 
 # +---------------------+
@@ -337,6 +353,23 @@ class DnsMessage:
             # self.additional.append(additional_r)
         bb.pos = 0  # Reset cursor @ buffer
         return self
+
+    # NOTE: appending to string stringbuilder?, performance?
+    def __str__(self):
+        result = str(self.header) + "\n"
+        result += "Queries:\n"
+        for quest in self.question:
+            result += str(quest)
+        result += "Answers:\n"
+        for ans in self.answer:
+            result += str(ans)
+        result += "Authority:\n"
+        for auth in self.authority:
+            result += str(auth)
+        result += "Additional RRs:\n"
+        for ar in self.additional:
+            result += str(ar)
+        return result
 
 
 def build_header(num_questions: int = 0):

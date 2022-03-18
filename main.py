@@ -1,13 +1,8 @@
 from resolver.resolver import DnsMessage, ByteBuffer
-from tests.resolver_test import RESPONSE_NS_ROOT, QUERY_A_ROOT_SERVER
+from tests.resolver_test import RESPONSE_NS_ROOT, QUERY_A_ROOT_SERVER, RESPONSE_A_NS_BERKELEY
 
 if __name__ == "__main__":
-    bb = ByteBuffer(buf=bytes.fromhex(RESPONSE_NS_ROOT))
+    bb = ByteBuffer(buf=bytes.fromhex(RESPONSE_A_NS_BERKELEY))
     msg = DnsMessage().from_buffer(bb)
 
-    print(msg.header)
-    print("")
-
-    for ans in msg.answer:
-        print(ans)
-        print("")
+    print(msg)

@@ -33,6 +33,9 @@ QUERY_A_BERKELEY = "026373086265726b656c6579036564750000010001"
 RESPONSE_DNS_FRAME_A_WITH_JUMP = "08758180000100010000000001680c726f6f742d73657276657273036e65740000010001c00c0" \
                                  "0010001000882c00004c661be35"
 
+RESPONSE_A_NS_BERKELEY = "62a6818000010001000000000561646e7333086265726b656c6579036564750000010001c00c0001000100002a" \
+                         "300004c06b668e"
+
 RR_A_WITH_JUMP__ = "c00c00010001000882c00004c661be35"
 
 
@@ -130,7 +133,6 @@ class MyTestCase(unittest.TestCase):
     def test_dnsmessage_from_buffer(self):
         bb = ByteBuffer(buf=bytes.fromhex(RESPONSE_NS_ROOT))
         message = DnsMessage().from_buffer(bb)
-
 
 
 if __name__ == '__main__':
