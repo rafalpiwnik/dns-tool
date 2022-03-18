@@ -8,21 +8,21 @@ import numpy as np
 
 
 class Type(Enum):
-    A = 1,
-    NS = 2,
-    MD = 3,
-    MF = 4,
-    CNAME = 5,
-    SOA = 6,
-    MB = 7,
-    MR = 9,
-    NULL = 10,
-    WKS = 11,
-    PTR = 12,
-    HINFO = 13,
-    MINFO = 14,
-    MX = 15,
-    TXT = 16,
+    A = 1
+    NS = 2
+    MD = 3
+    MF = 4
+    CNAME = 5
+    SOA = 6
+    MB = 7
+    MR = 9
+    NULL = 10
+    WKS = 11
+    PTR = 12
+    HINFO = 13
+    MINFO = 14
+    MX = 15
+    TXT = 16
     AAAA = 28
 
 
@@ -53,11 +53,11 @@ TYPES: dict[str, int] = {
 
 
 class RCode(Enum):
-    NO_ERROR = 0,
-    FORMAT_ERROR = 1,
-    SERVER_FAILURE = 2,
-    NAME_ERROR = 3,
-    NOT_IMPLEMENTED = 4,
+    NO_ERROR = 0
+    FORMAT_ERROR = 1
+    SERVER_FAILURE = 2
+    NAME_ERROR = 3
+    NOT_IMPLEMENTED = 4
     REFUSED = 5
 
 
@@ -66,10 +66,22 @@ class ByteBuffer:
     buf: bytes
     pos: int = 0
 
+    def skip(self, n: int):
+        self.pos += n
+        return self
+
+    def read_uint8(self):
+        result = int.from_bytes(self.buf[self.pos:self.pos + 1], byteorder="big", signed=False)
+        self.pos += 1
+        return result
+
     def read_uint16(self):
-        result = self.buf[self.pos:self.pos + 2]
+        result = int.from_bytes(self.buf[self.pos:self.pos + 2], byteorder="big", signed=False)
         self.pos += 2
         return result
+
+    def peek_uint16(self):
+        return int.from_bytes(self.buf[self.pos:self.pos + 2], byteorder="big", signed=False)
 
     def read_qname(self):
         result: list[str] = []
@@ -85,19 +97,38 @@ class ByteBuffer:
 
 @dataclass
 class DnsHeader:
-    ID: np.uint16
-    recursive: bool
-    opcode: np.uint8
-    authoritative_answer: bool
-    truncation: bool
-    recursion_desired: bool
-    recursion_available: bool
-    Z: bool
-    response: RCode
-    qdcount: int
-    ancount: int
-    nscount: int
-    arcount: int
+    ID: int = int("0xaaaa", 16)
+    flags: int = int("0xbbbb", 16)
+    response: bool = False
+    recursive: bool = False
+    opcode: int = 0
+    authoritative_answer: bool = False
+    truncation: bool = False
+    recursion_desired: bool = True
+    recursion_available: bool = True
+    Z: int = 0
+    response_code: RCode = RCode.NOT_IMPLEMENTED
+    qdcount: int = 0
+    ancount: int = 0
+    nscount: int = 0
+    arcount: int = 0
+
+    def __init__(self, bb: ByteBuffer):
+        self.ID = bb.read_uint16()
+        self.flags = bb.read_uint16()
+        self._parse_flags(self.flags)
+
+    def _parse_flags(self, flags: int):
+        # Should change it to bin arithmetic /w flags
+        bin_repr = bin(flags)[2:]
+        self.response = bool(int(bin_repr[0]))
+        self.opcode = int(bin_repr[1:5], 2)
+        self.authoritative_answer = bool(int(bin_repr[5]))
+        self.truncation = bool(int(bin_repr[6]))
+        self.recursion_desired = bool(int(bin_repr[7]))
+        self.recursion_available = bool(int(bin_repr[8]))
+        self.Z = int(bin_repr[9:12], 2)
+        self.response_code = RCode(int(bin_repr[15]))
 
 
 @dataclass
