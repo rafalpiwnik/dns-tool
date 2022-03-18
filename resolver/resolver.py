@@ -1,8 +1,12 @@
 import binascii
+from dataclasses import dataclass
 from enum import Enum
+import numpy as np
 
 
 # Resource record TYPES as per RFC1035 + some others
+
+
 class Type(Enum):
     A = 1,
     NS = 2,
@@ -46,6 +50,61 @@ TYPES: dict[str, int] = {
     "TLSA": 52,
     "TSIG": 250
 }
+
+
+class RCode(Enum):
+    NO_ERROR = 0,
+    FORMAT_ERROR = 1,
+    SERVER_FAILURE = 2,
+    NAME_ERROR = 3,
+    NOT_IMPLEMENTED = 4,
+    REFUSED = 5
+
+
+@dataclass
+class ByteBuffer:
+    buf: bytes
+    pos: int = 0
+
+    def read_uint16(self):
+        result = self.buf[self.pos:self.pos + 2]
+        self.pos += 2
+        return result
+
+    def read_qname(self):
+        result: list[str] = []
+        label_length = self.buf[self.pos]
+        while label_length > 0:
+            self.pos += 1
+            label = self.buf[self.pos:self.pos + label_length].decode()
+            result.append(label)
+            self.pos += label_length
+            label_length = self.buf[self.pos]
+        return ".".join(result)
+
+
+@dataclass
+class DnsHeader:
+    ID: np.uint16
+    recursive: bool
+    opcode: np.uint8
+    authoritative_answer: bool
+    truncation: bool
+    recursion_desired: bool
+    recursion_available: bool
+    Z: bool
+    response: RCode
+    qdcount: int
+    ancount: int
+    nscount: int
+    arcount: int
+
+
+@dataclass
+class DnsQuestion:
+    qname: str  # yahoo.com. -> encoded
+    qtype: Type  # A
+    qclass: np.uint16 = 1  # Class IN
 
 
 #   0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
@@ -102,7 +161,7 @@ def build_question(name: str, QTYPE: Type = Type.A):
     labels = name.split(".")
     for label in labels:
         address_hex = binascii.hexlify(label.encode()).decode()
-        QNAME += f"{len(label ):02x}{address_hex}"
+        QNAME += f"{len(label):02x}{address_hex}"
     QNAME += "00"
 
     return QNAME
