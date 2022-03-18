@@ -55,9 +55,8 @@ class MyTestCase(unittest.TestCase):
 
     def test_dnsheader_read(self):
         bb = ByteBuffer(buf=bytes.fromhex(RESPONSE_NS_ROOT))
-        header = DnsHeader(bb)
+        header = DnsHeader().from_buffer(bb)
         self.assertEqual(int("0x1b9d", 16), header.ID)
-        self.assertEqual(int("0x8180", 16), header.flags)
         self.assertEqual(True, header.response)
         self.assertEqual(0, header.opcode)
         self.assertEqual(False, header.authoritative_answer)
@@ -66,6 +65,16 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, header.recursion_available)
         self.assertEqual(0, header.Z)
         self.assertEqual(RCode.NO_ERROR, header.response_code)
+        self.assertEqual(1, header.qdcount)
+        self.assertEqual(14, header.ancount)
+        self.assertEqual(0, header.nscount)
+        self.assertEqual(26, header.arcount)
+
+    def test_dnsheader_build(self):
+        bb = ByteBuffer(buf=bytes.fromhex(RESPONSE_NS_ROOT))
+        header = DnsHeader().from_buffer(bb)
+        message = header.build()
+        self.assertEqual("1b9d81800001000e0000001a", message)
 
 
 if __name__ == '__main__':

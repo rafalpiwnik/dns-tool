@@ -95,10 +95,23 @@ class ByteBuffer:
         return ".".join(result)
 
 
+#   0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+# |                      ID                       |
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+# |QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+# |                    QDCOUNT                    |
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+# |                    ANCOUNT                    |
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+# |                    NSCOUNT                    |
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+# |                    ARCOUNT                    |
+# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 @dataclass
 class DnsHeader:
     ID: int = int("0xaaaa", 16)
-    flags: int = int("0xbbbb", 16)
     response: bool = False
     recursive: bool = False
     opcode: int = 0
@@ -113,10 +126,32 @@ class DnsHeader:
     nscount: int = 0
     arcount: int = 0
 
-    def __init__(self, bb: ByteBuffer):
+    def from_buffer(self, bb: ByteBuffer):
         self.ID = bb.read_uint16()
-        self.flags = bb.read_uint16()
-        self._parse_flags(self.flags)
+        flags = bb.read_uint16()
+        self._parse_flags(flags)
+        self.qdcount = bb.read_uint16()
+        self.ancount = bb.read_uint16()
+        self.nscount = bb.read_uint16()
+        self.arcount = bb.read_uint16()
+        return self
+
+    def build(self):
+        message = f"{self.ID:04x}"
+
+        params = f"{self.response:d}" \
+                 f"{bin(self.opcode)[2:].zfill(4)}" \
+                 f"{self.authoritative_answer:d}" \
+                 f"{self.truncation:d}" \
+                 f"{self.recursion_desired:d}" \
+                 f"{self.recursion_available:d}" \
+                 f"{bin(self.Z)[2:].zfill(3)}" \
+                 f"{bin(self.response_code.value)[2:].zfill(4)}"
+
+        message += f"{int(params, 2):04x}"
+        message += f"{self.qdcount:04x}{self.ancount:04x}{self.nscount:04x}{self.arcount:04x}"
+
+        return message
 
     def _parse_flags(self, flags: int):
         # Should change it to bin arithmetic /w flags
@@ -138,20 +173,6 @@ class DnsQuestion:
     qclass: np.uint16 = 1  # Class IN
 
 
-#   0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
-# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-# |                      ID                       |
-# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-# |QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
-# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-# |                    QDCOUNT                    |
-# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-# |                    ANCOUNT                    |
-# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-# |                    NSCOUNT                    |
-# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-# |                    ARCOUNT                    |
-# +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 def build_header(num_questions: int = 0):
     ID = 1440
 
