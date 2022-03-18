@@ -1,6 +1,6 @@
 import unittest
 
-from resolver.resolver import ByteBuffer, DnsHeader, RCode, DnsQuestion, QType, QClass, DnsResourceRecord
+from resolver.resolver import ByteBuffer, DnsHeader, RCode, DnsQuestion, QType, QClass, DnsResourceRecord, DnsMessage
 
 RESPONSE_NS_ROOT = "1b9d81800001000e0000001a0000020001000002000100070bf2001401660c726f6f742d73657276657273036e657400" \
                    "000002000100070bf200040163c01e000002000100070bf20004016ac01e000002000100070bf20004016dc01e000002" \
@@ -25,6 +25,8 @@ RESPONSE_NS_ROOT = "1b9d81800001000e0000001a0000020001000002000100070bf200140166
                    "0000000000000000000dc0c200010001000861ec0004c0249411c0c2001c000100085ff90010200107fe000000000000" \
                    "000000000053c0d10001000100089b130004c0702404c0d1001c000100088d1400102001050000120000000000000000" \
                    "0d0d0000290200000080000000"
+
+QUERY_A_ROOT_SERVER = "e2b40100000100000000000001630c726f6f742d73657276657273036e65740000010001"
 
 QUERY_A_BERKELEY = "026373086265726b656c6579036564750000010001"
 
@@ -124,6 +126,11 @@ class MyTestCase(unittest.TestCase):
         question = DnsQuestion().from_buffer(bb)
         message = question.build()
         self.assertEqual(QUERY_A_BERKELEY, message)
+
+    def test_dnsmessage_from_buffer(self):
+        bb = ByteBuffer(buf=bytes.fromhex(RESPONSE_NS_ROOT))
+        message = DnsMessage().from_buffer(bb)
+
 
 
 if __name__ == '__main__':

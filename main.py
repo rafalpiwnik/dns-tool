@@ -1,9 +1,13 @@
-from resolver.resolver import build_header, build_question, DnsHeader
-from resolver import ByteBuffer
+from resolver.resolver import DnsMessage, ByteBuffer
+from tests.resolver_test import RESPONSE_NS_ROOT, QUERY_A_ROOT_SERVER
 
 if __name__ == "__main__":
-    build_header()
-    print(build_question("cs.berkeley.edu"))
-    bb = ByteBuffer(buf=bytes.fromhex("026373086265726b656c65790365647500"))
+    bb = ByteBuffer(buf=bytes.fromhex(RESPONSE_NS_ROOT))
+    msg = DnsMessage().from_buffer(bb)
 
-    print(bb.read_qname())
+    print(msg.header)
+    print("")
+
+    for ans in msg.answer:
+        print(ans)
+        print("")

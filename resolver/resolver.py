@@ -1,6 +1,6 @@
 import binascii
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 
@@ -22,6 +22,8 @@ class QType(Enum):
     MX = 15
     TXT = 16
     AAAA = 28
+    OPT = 41
+    RRSIG = 46
 
 
 class QClass(Enum):
@@ -165,7 +167,7 @@ class DnsHeader:
 
     def _parse_flags(self, flags: int):
         # Should change it to bin arithmetic /w flags
-        bin_repr = bin(flags)[2:]
+        bin_repr = bin(flags)[2:].zfill(16)
         self.response = bool(int(bin_repr[0]))
         self.opcode = int(bin_repr[1:5], 2)
         self.authoritative_answer = bool(int(bin_repr[5]))
@@ -174,6 +176,14 @@ class DnsHeader:
         self.recursion_available = bool(int(bin_repr[8]))
         self.Z = int(bin_repr[9:12], 2)
         self.response_code = RCode(int(bin_repr[15]))
+
+    def __repr__(self):
+        return "DNS Header\n" \
+               f"\tTransaction ID: 0x{self.ID:04X}\n" \
+               f"\tQuestions: {self.qdcount}\n" \
+               f"\tAnswer RRs: {self.ancount}\n" \
+               f"\tAuthority RRs: {self.nscount}\n" \
+               f"\tAdditional RRs: {self.arcount}"
 
 
 #   0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
@@ -222,7 +232,14 @@ class ARecord(RData):
         return f"{int(self.data[:2], 16)}.{int(self.data[2:4], 16)}.{int(self.data[4:6], 16)}.{int(self.data[6:], 16)}"
 
 
-#   0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+class NSRecord(RData):
+    data: str
+
+    def __init__(self, bb: ByteBuffer):
+        self.data = bb.read_qname()
+
+
+# 0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
 # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 # |                                               |
 # /                                               /
@@ -260,17 +277,66 @@ class DnsResourceRecord:
         # RDATA - format varies accoring to qtype, qclass - should be parsed differently
         # e.g. NS -> a-dns.pl but A -> 192.42.39.11
         # Name can be compressed and replaced with pointer
-        record_data = str(bb.read_plain(self.rdlength))
 
         if self.qtype == QType.A:
-            self.rdata = ARecord(record_data)
+            self.rdata = ARecord(bb.read_plain(self.rdlength))
+        elif self.qtype == QType.NS:
+            self.rdata = NSRecord(bb)
         else:
-            self.rdata = RData(str(bb.read_plain(self.rdlength)))
+            # Cannot double read !
+            self.rdata = RData(bb.read_plain(self.rdlength))
 
         return self
 
     def readable_ttl(self):
         return time.strftime("%H:%M:%S", time.gmtime(self.ttl))
+
+    def __repr__(self):
+        result = f"{self.name}:" if len(self.name) > 0 else "<Root>:"
+        result += f" type: {self.qtype},"
+        result += f" class: {self.qclass}"
+        result += f" data: {self.rdata}"
+        return result
+
+
+# +---------------------+
+# |        Header       |
+# +---------------------+
+# |       Question      | the question for the name server
+# +---------------------+
+# |        Answer       | RRs answering the question
+# +---------------------+
+# |      Authority      | RRs pointing toward an authority
+# +---------------------+
+# |      Additional     | RRs holding additional information
+# +---------------------+
+@dataclass
+class DnsMessage:
+    header: DnsHeader = DnsHeader()
+    question: list[DnsQuestion] = field(default_factory=list)
+    answer: list[DnsResourceRecord] = field(default_factory=list)
+    authority: list[DnsResourceRecord] = field(default_factory=list)
+    additional: list[DnsResourceRecord] = field(default_factory=list)
+
+    # Throws ValueError when encountered unknown QType
+    def from_buffer(self, bb: ByteBuffer):
+        self.header = DnsHeader().from_buffer(bb)
+        for _ in range(self.header.qdcount):
+            q = DnsQuestion().from_buffer(bb)
+            self.question.append(q)
+        for _ in range(self.header.ancount):
+            an = DnsResourceRecord().from_buffer(bb)
+            self.answer.append(an)
+        for _ in range(self.header.nscount):
+            auth_ns = DnsResourceRecord().from_buffer(bb)
+            self.authority.append(auth_ns)
+        for _ in range(self.header.arcount):
+            pass
+            # NOTE: Not implemented due to OPT Qtype not having QClass and different layout in general
+            # additional_r = DnsResourceRecord().from_buffer(bb)
+            # self.additional.append(additional_r)
+        bb.pos = 0  # Reset cursor @ buffer
+        return self
 
 
 def build_header(num_questions: int = 0):
