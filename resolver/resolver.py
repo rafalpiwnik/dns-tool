@@ -1,4 +1,5 @@
 import binascii
+import time
 from dataclasses import dataclass
 from enum import Enum
 import numpy as np
@@ -95,6 +96,13 @@ class ByteBuffer:
         self.pos += 4
         return result
 
+    # TODO - really should throw bufferoutofbounds
+    def read_plain(self, num_bytes: int):
+        result = self.buf[self.pos:self.pos + num_bytes]
+        self.pos += num_bytes
+        return result
+
+    # TODO - there can be jumps (ptrs) represented by 0x0c
     def read_qname(self):
         result: list[str] = []
         label_length = self.buf[self.pos]
@@ -212,6 +220,19 @@ class DnsQuestion:
         return message
 
 
+@dataclass
+class RData:
+    data: str = ""  # Hex stream
+
+    def __repr__(self):
+        return self.data
+
+
+class ARecord(RData):
+    def __repr__(self):
+        return f"{int(self.data[:2], 16)}.{int(self.data[2:4], 16)}.{int(self.data[4:6], 16)}.{int(self.data[6:], 16)}"
+
+
 #   0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
 # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 # |                                               |
@@ -237,8 +258,8 @@ class DnsResourceRecord:
     qtype: QType = QType.A
     qclass: QClass = QClass.IN
     ttl: int = 0
-    rdlength: int = 0
-    rdata: str = ""
+    rdlength: int = 0  # Length of RDATA in octets
+    rdata: RData = RData("")
 
     def from_buffer(self, bb: ByteBuffer):
         self.name = bb.read_qname()
@@ -250,6 +271,17 @@ class DnsResourceRecord:
         # RDATA - format varies accoring to qtype, qclass - should be parsed differently
         # e.g. NS -> a-dns.pl but A -> 192.42.39.11
         # Name can be compressed and replaced with pointer
+        record_data = str(bb.read_plain(self.rdlength))
+
+        if self.qtype == QType.A:
+            self.rdata = ARecord(record_data)
+        else:
+            self.rdata = RData(str(bb.read_plain(self.rdlength)))
+
+        return self
+
+    def readable_ttl(self):
+        return time.strftime("%H:%M:%S", time.gmtime(self.ttl))
 
 
 def build_header(num_questions: int = 0):
