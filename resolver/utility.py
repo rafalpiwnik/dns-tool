@@ -16,6 +16,6 @@ def to_qname(domain_name: str):
     return qname
 
 
-def fqdm(domain_name: str):
+def fqdn(domain_name: str):
     """Creates fully qualified domain name"""
     return f"{domain_name}."

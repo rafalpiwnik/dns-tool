@@ -1,12 +1,13 @@
 import binascii
 import ipaddress
+import random
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
 
-from typing import Union
+from typing import Union, Optional, Literal
 from resolver.buffer import ByteBuffer
-from resolver.utility import to_qname
+from resolver.utility import to_qname, fqdn
 
 
 class QType(Enum):
@@ -159,16 +160,12 @@ class DnsQuestion:
         message = f"{QNAME}{self.qtype.value:04x}{self.qclass.value:04x}"
         return message
 
-    def fqdn(self):
-        """Fully qualified domain name"""
-        return f"{self.name}."
-
     def concise_info(self, name_pad=25, type_just=10) -> str:
-        name_just = max(name_pad, len(self.fqdn()) + type_just)
-        return self.fqdn().ljust(name_just) + self.qclass.name + self.qtype.name.rjust(type_just)
+        name_just = max(name_pad, len(self.name) + type_just)
+        return fqdn(self.name).ljust(name_just) + self.qclass.name + self.qtype.name.rjust(type_just)
 
     def __repr__(self):
-        return f"{self.fqdn()}: type: {self.qtype}, class: {self.qclass}"
+        return f"{fqdn(self.name)}: type: {self.qtype}, class: {self.qclass}"
 
     def __str__(self):
         return f"\tName: {'.' if self.name == '' else self.name}\n" \
@@ -366,7 +363,6 @@ class DnsMessage:
             auth_ns = DnsResourceRecord().from_buffer(bb)
             self.authority.append(auth_ns)
         for _ in range(self.header.arcount):
-            # NOTE: Not implemented due to OPT Qtype not having QClass and different layout in general
             additional_r = DnsResourceRecord().from_buffer(bb)
             self.additional.append(additional_r)
         bb.pos = 0  # Reset cursor @ buffer
@@ -376,7 +372,7 @@ class DnsMessage:
         return self.from_buffer(ByteBuffer(data))
 
     # NOTE: Build doesn't compress message using name compressions
-    def build(self):
+    def build(self) -> bytes:
         message = self.header.build()
         for q in self.question:
             message += q.build()
@@ -388,8 +384,18 @@ class DnsMessage:
             message += ar.build()
         return binascii.unhexlify(message)
 
-    def __repr__(self):
-        return f"DNS Message: {repr(self.header)}"
+    def resolved_ns(self, target_section: Literal["answer", "authority"] = "authority"):
+        """For queries containing NS records in target_section looks for corresponding additional A type records
+        and returns mapping from NS record domain names onto IPv4Addresses"""
+        target = self.authority if target_section == "authority" else self.answer
+        ns_target = {fqdn(str(ans.rdata)) for ans in target if ans.qtype == QType.NS}
+        result = {ar.name: str(ar.rdata) for ar in self.additional if
+                  ar.qtype == QType.A and fqdn(ar.name) in ns_target}
+        return result
+
+    def answer_records(self, filter_by_type: QType):
+        answer_records = [str(ans.rdata) for ans in self.answer if ans.qtype == filter_by_type]
+        return answer_records
 
     def print_concise_info(self):
         print(self.header.concise_info())
@@ -405,6 +411,9 @@ class DnsMessage:
         print("\n<<ADDITIONAL>>")
         for ar in self.additional:
             print(ar.concise_info())
+
+    def __repr__(self):
+        return f"DNS Message: {repr(self.header)}"
 
     # NOTE: appending to string stringbuilder?, performance?
     def __str__(self):
