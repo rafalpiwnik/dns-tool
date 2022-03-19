@@ -1,5 +1,4 @@
 import binascii
-import ipaddress
 import random
 import socket
 from typing import Union, Optional
@@ -13,24 +12,24 @@ def lookup(domain_name: str,
            recursive: bool = True,
            opt_size: Optional[int] = 4096) -> DnsMessage:
     server = (server_ip, 53)
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     msg = create_query(domain_name, record_type, opt_size)
     msg.header.recursion_desired = recursive
+    # msg.header.Z = 0b010
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind(("0.0.0.0", 1444))
     try:
         sock.sendto(msg.build(), server)
-        data, _ = sock.recvfrom(4096)
+        data = sock.recv(4096)
         response = DnsMessage().from_bytes(data)
         response.print_concise_info()
         return response
-    except OSError:
-        print(f"Lookup for {domain_name} @{server_ip} failed.")
     finally:
         sock.close()
 
 
 def create_query(domain_name: str, record_type: Union[str, QType], opt_size: Optional[int] = 4096) -> DnsMessage:
-    if opt_size < 0:
-        raise ValueError(f"opt_size={opt_size} is invalid. Opt payload size must be a positive integer")
+    # if opt_size < 0:
+    #     raise ValueError(f"opt_size={opt_size} is invalid. Opt payload size must be a positive integer")
 
     if isinstance(record_type, QType):
         query_type = record_type
@@ -52,10 +51,11 @@ def create_query(domain_name: str, record_type: Union[str, QType], opt_size: Opt
                            qtype=query_type,
                            qclass=QClass.IN)
 
-    opt = DnsResourceRecord().pseudo_record(domain_name=".", udp_payload_size=opt_size)
-
     msg = DnsMessage(header=header,
-                     question=[question],
-                     additional=[opt])
+                     question=[question])
+
+    if opt_size:
+        opt = DnsResourceRecord().pseudo_record(domain_name=".", udp_payload_size=opt_size)
+        msg.additional.append(opt)
 
     return msg
