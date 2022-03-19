@@ -14,7 +14,7 @@ if __name__ == "__main__":
 
     # OPT needed for query for NS . - why, payload size?
     q2 = DnsQuestion(name=".", qtype=QType.NS, qclass=QClass.IN)
-    q3 = DnsQuestion(name="edu.pl.", qtype=QType.NS, qclass=QClass.IN)
+    q3 = DnsQuestion(name="edu.pl.", qtype=QType.MX, qclass=QClass.IN)
     q4 = DnsQuestion(name="i-dns.pl", qtype=QType.A, qclass=QClass.IN)
     q5 = DnsQuestion(name="i-dns.pl", qtype=QType.AAAA, qclass=QClass.IN)
 
@@ -23,7 +23,7 @@ if __name__ == "__main__":
     # Build message
     message = DnsMessage()
     message.header = header
-    message.question = [q2]
+    message.question = [q3]
 
     header.arcount = 1
     message.additional = [pr]
@@ -37,6 +37,6 @@ if __name__ == "__main__":
         data, _ = sock.recvfrom(4096)
         bb = ByteBuffer(buf=data)
         response = DnsMessage().from_buffer(bb)
-        print(response)
+        response.print_concise_info()
     finally:
         sock.close()

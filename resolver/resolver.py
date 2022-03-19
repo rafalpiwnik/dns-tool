@@ -183,7 +183,17 @@ class DnsHeader:
         self.Z = int(bin_repr[9:12], 2)
         self.response_code = RCode(int(bin_repr[15]))
 
-    def __repr__(self):
+    def concise_info(self):
+        flags_present = f"{'AA ' if self.authoritative_answer else ''}" \
+                        f"{'TC ' if self.truncation else ''}" \
+                        f"{'RD ' if self.recursion_desired else ''}" \
+                        f"{'RA ' if self.recursion_available else ''}"
+
+        return f"<<HEADER>> opcode: {self.opcode}, status: {self.response_code}, id: {self.ID}\n" \
+               f"flags: {flags_present}#query: {self.qdcount}, #answer: {self.ancount}, #authority: {self.nscount}," \
+               f" #additional: {self.arcount}"
+
+    def __str__(self):
         return "DNS Header\n" \
                f"\tTransaction ID: 0x{self.ID:04X}\n" \
                f"\tQuestions: {self.qdcount}\n" \
@@ -237,6 +247,9 @@ class DnsQuestion:
     def fqdn(self):
         """Fully qualified domain name"""
         return f"{self.name}."
+
+    def concise_info(self, name_just=25, type_just=10):
+        return self.fqdn().ljust(name_just) + self.qclass.name + self.qtype.name.rjust(type_just)
 
     def __repr__(self):
         return f"{self.fqdn()}: type: {self.qtype}, class: {self.qclass}"
@@ -377,8 +390,17 @@ class DnsResourceRecord:
     def qclass_value(self):
         return self.qclass.value if isinstance(self.qclass, QClass) else self.qclass
 
+    def qclass_name(self):
+        return self.qclass.name if isinstance(self.qclass, QClass) else str(self.qclass)
+
     def readable_ttl(self):
         return str(timedelta(seconds=self.ttl))
+
+    def concise_info(self, name_pad: int = 20, secondary_just: int = 8) -> str:
+        name_just = max(name_pad, len(self.name) + secondary_just)
+        return f"{self.name}.".ljust(name_just) + str(self.ttl).rjust(secondary_just) + \
+               self.qclass_name().rjust(secondary_just) + self.qtype.name.rjust(secondary_just) + \
+               " " * secondary_just + str(self.rdata)
 
     def __repr__(self):
         result = f"{self.name}:" if len(self.name) > 0 else "<Root>:"
@@ -390,7 +412,7 @@ class DnsResourceRecord:
     def __str__(self):
         return f"\tName: {'.' if self.name == '' else self.name}\n" \
                f"\tType: {self.qtype.name}\n" \
-               f"\tClass: {self.qclass.name if isinstance(self.qclass, QClass) else self.qclass}\n" \
+               f"\tClass: {self.qclass_name()}\n" \
                f"\tTime to live: {self.ttl} ({self.readable_ttl()})\n" \
                f"\tData length: {self.rdlength}\n" \
                f"\tData: {self.rdata}\n\n"
@@ -449,6 +471,21 @@ class DnsMessage:
 
     def __repr__(self):
         return f"DNS Message: {repr(self.header)}"
+
+    def print_concise_info(self):
+        print(self.header.concise_info())
+        print("\n<<QUESTION>>")
+        for q in self.question:
+            print(q.concise_info())
+        print("\n<<ANSWER>>")
+        for ans in self.answer:
+            print(ans.concise_info())
+        print("\n<<AUTHORITY>>")
+        for auth in self.authority:
+            print(auth.concise_info())
+        print("\n<<ADDITIONAL>>")
+        for ar in self.additional:
+            print(ar.concise_info())
 
     # NOTE: appending to string stringbuilder?, performance?
     def __str__(self):
