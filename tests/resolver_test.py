@@ -1,7 +1,9 @@
 import binascii
 import unittest
 
-from resolver.resolver import ByteBuffer, DnsHeader, RCode, DnsQuestion, QType, QClass, DnsResourceRecord, DnsMessage
+from resolver import DnsHeader, DnsQuestion, QType, QClass, DnsResourceRecord, DnsMessage
+from resolver.buffer import ByteBuffer
+from resolver.packet import RCode
 
 RESPONSE_NS_ROOT = "1b9d81800001000e0000001a0000020001000002000100070bf2001401660c726f6f742d73657276657273036e657400" \
                    "000002000100070bf200040163c01e000002000100070bf20004016ac01e000002000100070bf20004016dc01e000002" \
