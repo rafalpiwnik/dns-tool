@@ -14,7 +14,7 @@ if __name__ == "__main__":
     # m = lookup("yahoo.com", "A", server_ip="68.180.131.16", recursive=False)
 
     # DDoS protection on root servers / TLD servers??
-    m = lookup("yahoo.com", "A", server_ip="198.41.0.4", recursive=False)
+    # m = lookup("yahoo.com", "A", server_ip="198.41.0.4", recursive=False)
     # m = lookup("yahoo.com", "A", server_ip="192.112.36.4", recursive=False)
 
     # m1 = lookup("", "NS", recursive=False)
@@ -32,4 +32,4 @@ if __name__ == "__main__":
     # m7 = lookup("yahoo.com", "A", server_ip=yahoo_ns_ip, recursive=False)
     # print("FOUND " + str(m7.answer[0].rdata))
 
-    # rslv.recursive_resolve("yahoo.com")
+    rslv.recursive_resolve("yahoo.com")

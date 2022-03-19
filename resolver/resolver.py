@@ -35,10 +35,9 @@ def lookup(domain_name: str,
            opt_size: Optional[int] = 4096) -> DnsMessage:
     print(f"Querying {record_type} {domain_name} @{server_ip}...")
     server = (server_ip, 53)
-    msg = create_query(domain_name, record_type, opt_size=None)
+    msg = create_query(domain_name, record_type, opt_size)
     msg.header.recursion_desired = recursive
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    msg.header.Z = 0b010
     try:
         # TESTING
         # msg.header.arcount = 1

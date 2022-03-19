@@ -68,7 +68,7 @@ class DnsHeader:
     truncation: bool = False
     recursion_desired: bool = True
     recursion_available: bool = False
-    Z: int = 0
+    Z: int = 0b010  # AD bit set
     response_code: RCode = RCode.NO_ERROR
     qdcount: int = 0
     ancount: int = 0
