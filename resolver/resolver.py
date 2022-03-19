@@ -12,6 +12,11 @@ def recursive_resolve(domain_name: str, record_type: Union[QType, str] = QType.A
     resolved_root_ns = root_ns.resolved_ns(target_section="answer")
     name, addr = random.choice(list(resolved_root_ns.items()))
 
+    # TODO: remove after testing
+    # Some root servers are overloaded / have protection / ?
+    # and they dont respond more often
+    addr = "192.12.94.30"
+
     # FQDN vs name -> sometimes this equality may break
     while not name == domain_name:
         res = lookup(domain_name, record_type, server_ip=addr, recursive=False)
