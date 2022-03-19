@@ -8,10 +8,14 @@ if __name__ == "__main__":
     # m = lookup(".", "NS", recursive=False)
     # m = lookup("a.root-servers.net", "A", recursive=False)
     # m = lookup("yahoo.com", "A", server_ip="198.41.0.4", recursive=False)
-    m = lookup("a.gtld-servers.net", "A", server_ip="198.41.0.4", recursive=False)
+    # m = lookup("a.gtld-servers.net", "A", server_ip="198.41.0.4", recursive=False, opt_size=None)
     # m = lookup("yahoo.com", "A", server_ip="192.12.94.30", recursive=False)
     # m = lookup("ns1.yahoo.com", "A", server_ip="192.12.94.30", recursive=False)
     # m = lookup("yahoo.com", "A", server_ip="68.180.131.16", recursive=False)
+
+    # DDoS protection on root servers / TLD servers??
+    # m = lookup("yahoo.com", "A", server_ip="198.41.0.4", recursive=False)
+    m = lookup("yahoo.com", "A", server_ip="192.12.94.30", recursive=False)
 
     # m1 = lookup("", "NS", recursive=False)
     # root_ns = str(m1.answer[0].rdata)

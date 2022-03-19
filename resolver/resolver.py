@@ -33,10 +33,15 @@ def lookup(domain_name: str,
     msg = create_query(domain_name, record_type, opt_size)
     msg.header.recursion_desired = recursive
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    # sock.bind(("0.0.0.0", 1444))
     try:
+        # TESTING
+        # msg.header.arcount = 1
+        # built_msg = msg.build().hex()
+        # built_msg += "00002904d000000000000c000a000801e606a00031bfec"   # Additional record
+        # built_msg = binascii.unhexlify(built_msg)
+
         sock.sendto(msg.build(), server)
-        data = sock.recv(4096)
+        data, _ = sock.recvfrom(4096)
         response = DnsMessage().from_bytes(data)
         response.print_concise_info()
         return response
