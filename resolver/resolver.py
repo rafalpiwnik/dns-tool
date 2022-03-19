@@ -75,10 +75,12 @@ class ByteBuffer:
         return result
 
     def read_plain(self, num_bytes: int):
-        # Would be easier without converting to hex stream, maybe change?
-        result = self.buf[self.pos:self.pos + num_bytes].hex()
+        result = self.peek_plain(num_bytes)
         self.pos += num_bytes
         return result
+
+    def peek_plain(self, num_bytes: int):
+        return self.buf[self.pos:self.pos + num_bytes].hex()
 
     # Jumps implemented but not error safe (loop jumps?)
     def read_qname(self):
@@ -269,15 +271,17 @@ class ARecord(RData):
         return str(addr)
 
 
-class NSRecord(RData):
-    def __init__(self, bb: ByteBuffer):
-        self.data = bb.read_qname()
+class NameRecord(RData):
+    """Reads and stores name-like RRs - e.g. NS, MX.
+    Maintains data as hex stream representation as it is used for building message back"""
+    name: str = "INVALID"
 
+    def __init__(self, bb: ByteBuffer, num_bytes: int):
+        self.data = bb.peek_plain(num_bytes)
+        self.name = bb.read_qname()
 
-# The same logic, different name, merge?
-class MXRecord(RData):
-    def __init__(self, bb: ByteBuffer):
-        self.data = bb.read_qname()
+    def __str__(self):
+        return self.name
 
 
 class AAAARecord(RData):
@@ -345,12 +349,10 @@ class DnsResourceRecord:
 
         if self.qtype == QType.A:
             self.rdata = ARecord(bb.read_plain(self.rdlength))
-        elif self.qtype == QType.NS:
-            self.rdata = NSRecord(bb)
+        elif self.qtype in [QType.NS, QType.MX]:
+            self.rdata = NameRecord(bb, num_bytes=self.rdlength)
         elif self.qtype == QType.AAAA:
             self.rdata = AAAARecord(bb.read_plain(self.rdlength))
-        elif self.qtype == QType.MX:
-            self.rdata = MXRecord(bb)
         elif self.qtype == QType.OPT:
             self.rdata = OPTRecord(bb.read_plain(self.rdlength))
         else:
@@ -432,9 +434,9 @@ class DnsMessage:
         bb.pos = 0  # Reset cursor @ buffer
         return self
 
+    # NOTE: Build doesn't compress message using name compressions
     def build(self):
         message = self.header.build()
-        # TODO can be compressed due to the same build interface
         for q in self.question:
             message += q.build()
         for ans in self.answer:
@@ -443,8 +445,6 @@ class DnsMessage:
             message += auth.build()
         for ar in self.additional:
             message += ar.build()
-        # if len(self.authority) > 0 or len(self.additional) > 0 or len(self.answer) > 0:
-        #     raise NotImplementedError("Cannot build message with answer, authority or additional sections")
         return binascii.unhexlify(message)
 
     def __repr__(self):
@@ -466,39 +466,3 @@ class DnsMessage:
         for ar in self.additional:
             result += str(ar)
         return result
-
-
-def build_header(num_questions: int = 0):
-    ID = 1440
-
-    QR = 1  # 1bit
-    OPCODE = 0  # 4bit
-    AA = 0  # 1bit
-    TC = 0  # 1bit
-    RD = 0  # 1bit
-    RA = 0  # 1bit
-    Z = 0  # 3bit
-    RCODE = 0  # 4bit
-
-    QDCOUNT = num_questions
-    ANCOUNT = 0
-    NSCOUNT = 0
-    ARCOUNT = 0
-
-    # Hard to read and debug
-    params = f"{QR}{str(OPCODE).zfill(4)}{AA}{TC}{RD}{RA}{str(Z).zfill(3)}{str(RCODE).zfill(4)}"
-    header = f"{ID:04x}{int(params, 2):04x}{QDCOUNT:04x}{ANCOUNT:04x}{NSCOUNT:04x}{ARCOUNT:04x}"
-
-    return header
-
-
-def build_question(name: str, QTYPE: QType = QType.A):
-    """name - e.g. cs.berkeley.edu"""
-    QNAME = ""
-    labels = name.split(".")
-    for label in labels:
-        address_hex = binascii.hexlify(label.encode()).decode()
-        QNAME += f"{len(label):02x}{address_hex}"
-    QNAME += "00"
-
-    return QNAME

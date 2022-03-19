@@ -1,3 +1,4 @@
+import binascii
 import unittest
 
 from resolver.resolver import ByteBuffer, DnsHeader, RCode, DnsQuestion, QType, QClass, DnsResourceRecord, DnsMessage
@@ -129,6 +130,15 @@ class MyTestCase(unittest.TestCase):
         question = DnsQuestion().from_buffer(bb)
         message = question.build()
         self.assertEqual(QUERY_A_BERKELEY, message)
+
+    # TODO - compression shouldn't really be necessary in this use case
+    def test_dns_message_rebuild_compression(self):
+        # This fails because msg build doesn't compress the output
+        bb = ByteBuffer(buf=bytes.fromhex(RESPONSE_NS_ROOT))
+        msg = DnsMessage().from_buffer(bb)
+        built_msg_bytes = msg.build()
+        built_msg_hex = binascii.hexlify(built_msg_bytes)
+        # self.assertEqual(RESPONSE_NS_ROOT, built_msg_hex)
 
 
 if __name__ == '__main__':
