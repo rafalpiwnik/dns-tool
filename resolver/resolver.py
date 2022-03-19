@@ -3,7 +3,7 @@ import random
 import socket
 from typing import Union, Optional
 
-from resolver.packet import DnsHeader, QType, DnsMessage, DnsQuestion, QClass, DnsResourceRecord
+from resolver.packet import DnsHeader, QType, DnsMessage, DnsQuestion, QClass, DnsResourceRecord, RCode
 
 
 def recursive_resolve(domain_name: str, record_type: Union[QType, str] = QType.A):
@@ -35,15 +35,20 @@ def lookup(domain_name: str,
            opt_size: Optional[int] = 4096) -> DnsMessage:
     print(f"Querying {record_type} {domain_name} @{server_ip}...")
     server = (server_ip, 53)
-    msg = create_query(domain_name, record_type, opt_size)
+    msg = create_query(domain_name, record_type, opt_size=None)
     msg.header.recursion_desired = recursive
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    msg.header.Z = 0b010
     try:
         # TESTING
         # msg.header.arcount = 1
         # built_msg = msg.build().hex()
         # built_msg += "00002904d000000000000c000a000801e606a00031bfec"   # Additional record
         # built_msg = binascii.unhexlify(built_msg)
+
+        # This query always returns correctly
+        built_msg = binascii.unhexlify("6af300200001000000000001057961686f6f03636f6d0000010001000029100000000000000"
+                                       "c000a00087f8a8c72d252493b")
 
         sock.sendto(msg.build(), server)
         data, _ = sock.recvfrom(4096)

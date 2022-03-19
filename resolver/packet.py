@@ -67,9 +67,9 @@ class DnsHeader:
     authoritative_answer: bool = False
     truncation: bool = False
     recursion_desired: bool = True
-    recursion_available: bool = True
+    recursion_available: bool = False
     Z: int = 0
-    response_code: RCode = RCode.NOT_IMPLEMENTED
+    response_code: RCode = RCode.NO_ERROR
     qdcount: int = 0
     ancount: int = 0
     nscount: int = 0
