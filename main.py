@@ -1,13 +1,14 @@
 import time
 import resolver as rslv
 from resolver import lookup
+from resolver.packet import QType
 
 if __name__ == "__main__":
     # yahoo.com
     # m = lookup(".", "NS", recursive=False)
     # m = lookup("a.root-servers.net", "A", recursive=False)
     # m = lookup("yahoo.com", "A", server_ip="198.41.0.4", recursive=False)
-    # m = lookup("a.gtld-servers.net", "A", server_ip="198.41.0.4", recursive=False, opt_size=None)
+    m = lookup("a.gtld-servers.net", "A", server_ip="198.41.0.4", recursive=False)
     # m = lookup("yahoo.com", "A", server_ip="192.12.94.30", recursive=False)
     # m = lookup("ns1.yahoo.com", "A", server_ip="192.12.94.30", recursive=False)
     # m = lookup("yahoo.com", "A", server_ip="68.180.131.16", recursive=False)
@@ -27,4 +28,4 @@ if __name__ == "__main__":
     # m7 = lookup("yahoo.com", "A", server_ip=yahoo_ns_ip, recursive=False)
     # print("FOUND " + str(m7.answer[0].rdata))
 
-    rslv.recursive_resolve("yahoo.com")
+    # rslv.recursive_resolve("yahoo.com")

@@ -16,7 +16,7 @@ def recursive_resolve(domain_name: str, record_type: Union[QType, str] = QType.A
     while not name == domain_name:
         res = lookup(domain_name, record_type, server_ip=addr, recursive=False)
         resolved_pairs = res.resolved_ns()
-        answer_records = res.answer_records(filter_by_type=QType.A)
+        answer_records = res.answer_records(filter_by_type=record_type)
         if answer_records:
             print(answer_records)
             break
@@ -33,7 +33,7 @@ def lookup(domain_name: str,
     msg = create_query(domain_name, record_type, opt_size)
     msg.header.recursion_desired = recursive
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("0.0.0.0", 1444))
+    # sock.bind(("0.0.0.0", 1444))
     try:
         sock.sendto(msg.build(), server)
         data = sock.recv(4096)
