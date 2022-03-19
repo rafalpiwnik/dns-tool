@@ -1,12 +1,14 @@
 import binascii
 import ipaddress
+import os
+import random
 import time
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
 
 # Resource record TYPES as per RFC1035 + AAAA
-from typing import Union
+from typing import Union, Optional
 
 
 class QType(Enum):
@@ -181,7 +183,7 @@ class DnsHeader:
         self.recursion_desired = bool(int(bin_repr[7]))
         self.recursion_available = bool(int(bin_repr[8]))
         self.Z = int(bin_repr[9:12], 2)
-        self.response_code = RCode(int(bin_repr[15]))
+        self.response_code = RCode(int(bin_repr[12:], 2))
 
     def concise_info(self):
         flags_present = f"{'AA ' if self.authoritative_answer else ''}" \
@@ -248,8 +250,9 @@ class DnsQuestion:
         """Fully qualified domain name"""
         return f"{self.name}."
 
-    def concise_info(self, name_just=25, type_just=10):
-        return self.fqdn().ljust(name_just) + self.qclass.name + self.qtype.name.rjust(type_just)
+    def concise_info(self, name_pad=25, type_just=10) -> str:
+        name_just = max(name_pad, len(self.fqdn()) + type_just)
+        return self.fqdn().ljust(name_pad) + self.qclass.name + self.qtype.name.rjust(type_just)
 
     def __repr__(self):
         return f"{self.fqdn()}: type: {self.qtype}, class: {self.qclass}"
@@ -456,6 +459,9 @@ class DnsMessage:
         bb.pos = 0  # Reset cursor @ buffer
         return self
 
+    def from_bytes(self, data: bytes):
+        return self.from_buffer(ByteBuffer(data))
+
     # NOTE: Build doesn't compress message using name compressions
     def build(self):
         message = self.header.build()
@@ -503,3 +509,37 @@ class DnsMessage:
         for ar in self.additional:
             result += str(ar)
         return result
+
+
+# RESOLVER
+def create_query(domain_name: str, record_type: Union[str, QType], opt_size: Optional[int] = 4096) -> DnsMessage:
+    if opt_size < 0:
+        raise ValueError(f"opt_size={opt_size} is invalid. Opt payload size must be a positive integer")
+
+    if isinstance(record_type, QType):
+        query_type = record_type
+    else:
+        try:
+            query_type = QType[record_type]
+        except KeyError:
+            query_type = QType.A
+
+    transaction_id = int(binascii.hexlify(random.randbytes(2)), 16)
+    additional_count = 1 if opt_size else 0
+
+    header = DnsHeader(ID=transaction_id,
+                       recursion_desired=False,
+                       qdcount=1,
+                       arcount=additional_count)
+
+    question = DnsQuestion(name=domain_name,
+                           qtype=query_type,
+                           qclass=QClass.IN)
+
+    opt = DnsResourceRecord().pseudo_record(domain_name=".", udp_payload_size=opt_size)
+
+    msg = DnsMessage(header=header,
+                     question=[question],
+                     additional=[opt])
+
+    return msg

@@ -1,6 +1,7 @@
 import socket
 
-from resolver.resolver import DnsMessage, ByteBuffer, DnsHeader, DnsQuestion, QType, QClass, DnsResourceRecord
+from resolver.resolver import DnsMessage, ByteBuffer, DnsHeader, DnsQuestion, QType, QClass, DnsResourceRecord, \
+    create_query
 from tests.resolver_test import RESPONSE_NS_ROOT, QUERY_A_ROOT_SERVER, RESPONSE_A_NS_BERKELEY
 
 if __name__ == "__main__":
@@ -30,13 +31,15 @@ if __name__ == "__main__":
 
     built_message = message.build()
 
+    # CREATE QUERY
+
+    query = create_query("a-dns.pl", "SOA")
     server_params = ("1.1.1.1", 53)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        sock.sendto(built_message, server_params)
+        sock.sendto(query.build(), server_params)
         data, _ = sock.recvfrom(4096)
-        bb = ByteBuffer(buf=data)
-        response = DnsMessage().from_buffer(bb)
+        response = DnsMessage().from_bytes(data)
         response.print_concise_info()
     finally:
         sock.close()
