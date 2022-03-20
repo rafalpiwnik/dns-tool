@@ -6,14 +6,23 @@ from typing import Union, Optional
 from resolver.packet import DnsHeader, QType, DnsMessage, DnsQuestion, QClass, DnsResourceRecord, RCode
 
 
-def recursive_lookup(domain_name: str, record_type: Union[QType, str] = QType.A):
+def recursive_lookup(domain_name: str, record_type: Union[QType, str] = QType.A, output: bool = True):
     # Begin by choosing one of the root name servers - ask 1.1.1.1 for IPs of root name servers and choose one
     root_ns = lookup(".", "NS", server_ip="1.1.1.1", recursive=False, verbose=False)
     resolved_root_ns = root_ns.resolved_ns(target_section="answer")  # Assumes root NS will supply additional A records
     name, addr = random.choice(list(resolved_root_ns.items()))
 
+    if output:
+        root_ns.print_concise_info(sections={"answer"})
+
     while True:
         response = lookup(domain_name, record_type, server_ip=addr, recursive=False, verbose=False)
+
+        if output:
+            if response.answer:
+                response.print_concise_info(sections={"answer"})
+            else:
+                response.print_concise_info(sections={"authority"})
 
         # The name queried doesn't exist
         if response.header.response_code == RCode.NXDOMAIN:
@@ -63,7 +72,7 @@ def lookup(domain_name: str,
     msg.header.recursion_desired = recursive
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        sock.sendto(msg.build(), server)
+        sock.sendto(msg.build_bytes(), server)
         data, _ = sock.recvfrom(4096)
         response = DnsMessage().from_bytes(data)
         if verbose:

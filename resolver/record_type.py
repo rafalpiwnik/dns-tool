@@ -6,6 +6,12 @@ from resolver.buffer import ByteBuffer
 
 
 class QType(Enum):
+    """
+    Supported query QTypes
+    If parser encounters unknown RR type it falls back to base RData implementation which encapsulates a plain hex str
+    This list can be extended in which case parsing for new types shall be provided by introducing a RData subclass
+    and modifying RecordFactory to accommodate a new resource record type
+    """
     UNKNOWN = 0
     A = 1
     NS = 2

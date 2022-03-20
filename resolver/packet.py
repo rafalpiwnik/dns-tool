@@ -50,7 +50,7 @@ class DnsHeader:
         self.arcount = bb.read_uint16()
         return self
 
-    def build(self):
+    def build(self) -> str:
         message = f"{self.ID:04x}"
 
         params = f"{self.response:d}" \
@@ -120,14 +120,13 @@ class DnsQuestion:
         self.qclass = QClass(bb.read_uint16())
         return self
 
-    def build(self):
+    def build(self) -> str:
         QNAME = to_qname(self.name)
         message = f"{QNAME}{self.qtype.value:04x}{self.qclass.value:04x}"
         return message
 
-    def concise_info(self, name_pad=25, type_just=10) -> str:
-        name_just = max(name_pad, len(self.name) + type_just)
-        return fqdn(self.name).ljust(name_just) + self.qclass.name + self.qtype.name.rjust(type_just)
+    def concise_info(self, name_pad=54, type_just=8) -> str:
+        return fqdn(self.name).ljust(name_pad) + self.qclass.name + self.qtype.name.rjust(type_just)
 
     def __repr__(self):
         return f"{fqdn(self.name)}: type: {self.qtype}, class: {self.qclass}"
@@ -198,12 +197,13 @@ class DnsResourceRecord:
 
         return self
 
-    def build(self):
+    def build(self) -> str:
         qname = to_qname(self.name)
         qclass_value = self.qclass_value()
         return f"{qname}{self.qtype.value:04x}{qclass_value:04x}{self.ttl:08x}{self.rdlength:04x}{self.rdata.data}"
 
     def pseudo_record(self, domain_name: str, udp_payload_size: int):
+        """Creates OPT pseudo record with given udp_payload_size allowing for larger DNS responses"""
         self.name = domain_name
         self.qtype = QType.OPT
         self.qclass = udp_payload_size
@@ -222,8 +222,7 @@ class DnsResourceRecord:
         return str(timedelta(seconds=self.ttl))
 
     def concise_info(self, name_pad: int = 40, secondary_just: int = 8) -> str:
-        name_just = name_pad
-        return f"{self.name}.".ljust(name_just) + str(self.ttl).rjust(secondary_just) + \
+        return f"{self.name}.".ljust(name_pad) + str(self.ttl).rjust(secondary_just) + \
                self.qclass_name().rjust(secondary_just) + self.qtype.name.rjust(secondary_just) + \
                " " * secondary_just + str(self.rdata)
 
@@ -283,7 +282,7 @@ class DnsMessage:
     def from_bytes(self, data: bytes):
         return self.from_buffer(ByteBuffer(data))
 
-    def build(self) -> bytes:
+    def build(self) -> str:
         """Returns a valid DNS datagram encoded as bytes, ready for transmission with UDP
         NOTE name compression scheme as defined in RFC1035 is not implemented"""
         message = self.header.build()
@@ -295,7 +294,10 @@ class DnsMessage:
             message += auth.build()
         for ar in self.additional:
             message += ar.build()
-        return binascii.unhexlify(message)
+        return message
+
+    def build_bytes(self) -> bytes:
+        return binascii.unhexlify(self.build())
 
     def resolved_ns(self, target_section: Literal["answer", "authority"] = "authority"):
         """For queries containing NS records in target_section looks for corresponding additional A type records
