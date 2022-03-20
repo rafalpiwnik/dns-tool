@@ -33,11 +33,15 @@ class QClass(Enum):
 
 class RCode(Enum):
     NO_ERROR = 0
-    FORMAT_ERROR = 1
-    SERVER_FAILURE = 2
-    NAME_ERROR = 3
-    NOT_IMPLEMENTED = 4
+    FORMERR = 1
+    SERVFAIL = 2
+    NXDOMAIN = 3
+    NOTIMP = 4
     REFUSED = 5
+    YXDOMAIN = 6
+    XRRSET = 7
+    NOTAUTH = 8
+    NOTZONE = 9
 
 
 @dataclass

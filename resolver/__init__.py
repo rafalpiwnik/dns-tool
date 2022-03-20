@@ -1,1 +1,1 @@
-from resolver.resolver import lookup, recursive_resolve
+from resolver.resolver import lookup, recursive_lookup
