@@ -315,20 +315,32 @@ class DnsMessage:
         answer_records = [str(ans.rdata) for ans in self.answer if ans.qtype == filter_by_type]
         return answer_records
 
-    def print_concise_info(self):
+    def print_concise_info(self, sections: set[str] = {'question', 'answer', 'authority', 'additional'}):
         print(self.header.concise_info())
-        print("\n<<QUESTION>>")
-        for q in self.question:
-            print(q.concise_info())
-        print("\n<<ANSWER>>")
-        for ans in self.answer:
-            print(ans.concise_info())
-        print("\n<<AUTHORITY>>")
-        for auth in self.authority:
-            print(auth.concise_info())
-        print("\n<<ADDITIONAL>>")
-        for ar in self.additional:
-            print(ar.concise_info())
+
+        if "question" in sections:
+            print("<<QUESTION>>")
+            for q in self.question:
+                print(q.concise_info())
+            print("")
+
+        if "answer" in sections:
+            print("<<ANSWER>>")
+            for ans in self.answer:
+                print(ans.concise_info())
+            print("")
+
+        if "authority" in sections:
+            print("<<AUTHORITY>>")
+            for auth in self.authority:
+                print(auth.concise_info())
+            print("")
+
+        if "additional" in sections:
+            print("<<ADDITIONAL>>")
+            for ar in self.additional:
+                print(ar.concise_info())
+            print("")
 
     def __repr__(self):
         return f"DNS Message: {repr(self.header)}"

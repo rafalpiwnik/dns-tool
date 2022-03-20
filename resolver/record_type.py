@@ -75,7 +75,7 @@ class AAAARecord(RData):
         return str(addr)
 
 
-class NSRecord(RData):
+class NameRecord(RData):
     name: str = "INVALID"
 
     def __init__(self, bb: ByteBuffer, num_bytes: int):
@@ -85,6 +85,14 @@ class NSRecord(RData):
 
     def __str__(self):
         return self.name
+
+
+class NSRecord(NameRecord):
+    pass
+
+
+class CNAMERecord(NameRecord):
+    pass
 
 
 class MXRecord(RData):
@@ -102,14 +110,15 @@ class MXRecord(RData):
 
 class RecordFactory:
     @staticmethod
-    def get_record(qtype: QType, qclass: QClass, bb: ByteBuffer, rdlength: int):
+    def get_record(qtype: QType, qclass: QClass, bb: ByteBuffer, rdlength: int) -> RData:
         if qclass == QClass.IN or qtype == QType.OPT:
-            rdata = None
 
             if qtype == QType.A:
                 rdata = ARecord(bb.read_plain(rdlength))
             elif qtype == QType.NS:
                 rdata = NSRecord(bb, num_bytes=rdlength)
+            elif qtype == QType.CNAME:
+                rdata = CNAMERecord(bb, num_bytes=rdlength)
             elif qtype == QType.MX:
                 rdata = MXRecord(bb, num_bytes=rdlength)
             elif qtype == QType.AAAA:
@@ -121,4 +130,4 @@ class RecordFactory:
 
             return rdata
         else:
-            raise NotImplementedError("Can only handle RRs of class IN")
+            raise NotImplementedError("Can only handle RRs of class IN or OPT qtype")
