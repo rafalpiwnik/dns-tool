@@ -3,7 +3,7 @@ import binascii
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-from typing import Union, Literal, List
+from typing import Union, Literal
 from resolver.buffer import ByteBuffer
 from resolver.record_type import RCode, QClass, QType, RData, RecordFactory
 from resolver.utility import to_qname, fqdn
@@ -345,7 +345,6 @@ class DnsMessage:
     def __repr__(self):
         return f"DNS Message: {repr(self.header)}"
 
-    # NOTE: appending to string stringbuilder?, performance?
     def __str__(self):
         result = str(self.header) + "\n"
         result += "Queries:\n"

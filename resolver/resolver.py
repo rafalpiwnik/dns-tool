@@ -50,29 +50,6 @@ def recursive_lookup(domain_name: str, record_type: Union[QType, str] = QType.A)
         else:
             return response
 
-    # SOA, CNAME logic is still left to be implemented
-    # while not name == domain_name:
-    #     res = lookup(domain_name, record_type, server_ip=addr, recursive=False, verbose=False)
-    #
-    #     res.print_concise_info()
-    #
-    #     resolved_pairs = res.resolved_ns()
-    #     unresolved_ns = res.authority_ns()
-    #     if resolved_pairs:
-    #         name, addr = random.choice(list(resolved_pairs.items()))
-    #     elif unresolved_ns:
-    #         # TODO - implement logic
-    #         # DNS server didn't provide ips of NS in additional section
-    #         name = random.choice(unresolved_ns)
-    #
-    #     # if resolved_pairs or unresolved_ns:
-    #     #     res.print_concise_info(sections={"authority"})
-    #
-    #     answer_records = res.answer_records(filter_by_type=record_type)
-    #     if answer_records:
-    #         # res.print_concise_info(sections={"answer"})
-    #         break
-
 
 def lookup(domain_name: str,
            record_type: Union[str, QType],

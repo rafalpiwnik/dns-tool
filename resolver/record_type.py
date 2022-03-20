@@ -99,6 +99,30 @@ class CNAMERecord(NameRecord):
     pass
 
 
+class SOARecord(RData):
+    primary_ns: str = "INVALID"
+    responsible_mx: str = "INVALID"
+    serial: int = 0
+    refresh: int = 0
+    retry: int = 0
+    expire_limit: int = 0
+    minimum_ttl: int = 0
+
+    def __init__(self, bb: ByteBuffer, num_bytes: int):
+        self.data = bb.peek_plain(num_bytes)
+        self.primary_ns = bb.read_qname()
+        self.responsible_mx = bb.read_qname()
+        self.serial = bb.read_uint32()
+        self.refresh = bb.read_uint32()
+        self.retry = bb.read_uint32()
+        self.expire_limit = bb.read_uint32()
+        self.minimum_ttl = bb.read_uint32()
+
+    def __str__(self):
+        return f"{self.primary_ns}.\t{self.responsible_mx}." \
+               f" {self.serial} {self.retry} {self.expire_limit} {self.minimum_ttl}"
+
+
 class MXRecord(RData):
     mx_preference: int = 0
     name: str = "INVALID"
@@ -127,6 +151,8 @@ class RecordFactory:
                 rdata = MXRecord(bb, num_bytes=rdlength)
             elif qtype == QType.AAAA:
                 rdata = AAAARecord(bb.read_plain(rdlength))
+            elif qtype == QType.SOA:
+                rdata = SOARecord(bb, num_bytes=rdlength)
             elif qtype == QType.OPT:
                 rdata = OPTRecord(bb.read_plain(rdlength))
             else:
