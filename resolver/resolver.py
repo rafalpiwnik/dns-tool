@@ -65,12 +65,18 @@ def lookup(domain_name: str,
            server_ip: str = "1.1.1.1",
            recursive: bool = True,
            opt_size: Optional[int] = 4096,
-           verbose: bool = True) -> DnsMessage:
+           verbose: bool = True) -> Optional[DnsMessage]:
     print(f"Querying {record_type} {domain_name} @{server_ip}...")
     server = (server_ip, 53)
-    msg = create_query(domain_name, record_type, opt_size)
+
+    try:
+        msg = create_query(domain_name, record_type, opt_size)
+    except ValueError:
+        return None
+
     msg.header.recursion_desired = recursive
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
     try:
         sock.sendto(msg.build_bytes(), server)
         data, _ = sock.recvfrom(4096)
@@ -92,6 +98,7 @@ def create_query(domain_name: str, record_type: Union[str, QType], opt_size: Opt
         except KeyError:
             print(f"QType {record_type} not supported")
             query_type = QType.A
+            raise ValueError
 
     transaction_id = int(binascii.hexlify(random.randbytes(2)), 16)
     additional_count = 1 if opt_size else 0
