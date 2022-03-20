@@ -1,7 +1,7 @@
 import binascii
 import unittest
 
-from resolver import DnsHeader, DnsQuestion, QType, QClass, DnsResourceRecord, DnsMessage
+from resolver.packet import DnsHeader, DnsQuestion, QType, QClass, DnsResourceRecord, DnsMessage
 from resolver.buffer import ByteBuffer
 from resolver.packet import RCode
 

@@ -1,7 +1,4 @@
-import time
-import resolver as rslv
-from resolver import lookup
-from resolver.packet import QType
+from resolver import recursive_resolve, lookup
 
 if __name__ == "__main__":
     # yahoo.com
@@ -13,7 +10,6 @@ if __name__ == "__main__":
     # m = lookup("ns1.yahoo.com", "A", server_ip="192.12.94.30", recursive=False)
     # m = lookup("yahoo.com", "A", server_ip="68.180.131.16", recursive=False)
 
-    # DDoS protection on root servers / TLD servers??
     # m = lookup("yahoo.com", "A", server_ip="198.41.0.4", recursive=False)
     # m = lookup("yahoo.com", "A", server_ip="192.112.36.4", recursive=False)
 
@@ -32,4 +28,5 @@ if __name__ == "__main__":
     # m7 = lookup("yahoo.com", "A", server_ip=yahoo_ns_ip, recursive=False)
     # print("FOUND " + str(m7.answer[0].rdata))
 
-    rslv.recursive_resolve("yahoo.com")
+    lookup("cs.berkeley.edu", "MX")
+    # recursive_resolve("yahoo.com")

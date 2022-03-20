@@ -1,16 +1,17 @@
 import binascii
 import ipaddress
-import random
+
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
 
-from typing import Union, Optional, Literal
+from typing import Union, Literal
 from resolver.buffer import ByteBuffer
 from resolver.utility import to_qname, fqdn
 
 
 class QType(Enum):
+    UNKNOWN = 0
     A = 1
     NS = 2
     MD = 3
@@ -180,13 +181,17 @@ class RData:
     data: str  # Hex stream
 
     def __repr__(self):
+        """Returns plain hex string representation of RDATA"""
         return self.data
 
     def __str__(self):
+        """Returns parsed RDATA. Subclasses are free to implement whatever parsing they wish
+        If no parsing mechanism is provided children fall back to parent implementation of __str__"""
         return self.data
 
 
 class OPTRecord(RData):
+    """OPT pseudo record - no specialized parsing implementing due to brevity"""
     pass
 
 
@@ -197,12 +202,18 @@ class ARecord(RData):
         return str(addr)
 
 
-class NameRecord(RData):
-    """Reads and stores name-like RRs - e.g. NS, MX.
-    Maintains data as hex stream representation as it is used for building message back"""
+class AAAARecord(RData):
+    def __str__(self):
+        raw_addr = ":".join((self.data[i:i + 4]) for i in range(0, len(self.data), 4))
+        addr = ipaddress.ip_address(raw_addr)
+        return str(addr)
+
+
+class NSRecord(RData):
     name: str = "INVALID"
 
     def __init__(self, bb: ByteBuffer, num_bytes: int):
+        """NS record is initialized by byte buffer as it has to read name which may have been compressed"""
         self.data = bb.peek_plain(num_bytes)
         self.name = bb.read_qname()
 
@@ -210,11 +221,17 @@ class NameRecord(RData):
         return self.name
 
 
-class AAAARecord(RData):
+class MXRecord(RData):
+    mx_preference: int = 0
+    name: str = "INVALID"
+
+    def __init__(self, bb: ByteBuffer, num_bytes: int):
+        self.data = bb.peek_plain(num_bytes)
+        self.mx_preference = bb.read_uint16()
+        self.name = bb.read_qname()
+
     def __str__(self):
-        raw_addr = ":".join((self.data[i:i + 4]) for i in range(0, len(self.data), 4))
-        addr = ipaddress.ip_address(raw_addr)
-        return str(addr)
+        return self.name
 
 
 # +------------+--------------+------------------------------+
@@ -254,7 +271,7 @@ class AAAARecord(RData):
 class DnsResourceRecord:
     name: str = "."
     qtype: QType = None
-    qclass: Union[QClass, int] = None  # Can be either class or UDP payload size when using OP pseudo-RR
+    qclass: Union[QClass, int] = None  # Can be either QClass instance or UDP payload size when using OP pseudo-RR
     ttl: int = 0
     rdlength: int = 0  # Length of RDATA in octets
     rdata: RData = RData("")
@@ -275,8 +292,10 @@ class DnsResourceRecord:
 
         if self.qtype == QType.A:
             self.rdata = ARecord(bb.read_plain(self.rdlength))
-        elif self.qtype in [QType.NS, QType.MX]:
-            self.rdata = NameRecord(bb, num_bytes=self.rdlength)
+        elif self.qtype == QType.NS:
+            self.rdata = NSRecord(bb, num_bytes=self.rdlength)
+        elif self.qtype == QType.MX:
+            self.rdata = MXRecord(bb, num_bytes=self.rdlength)
         elif self.qtype == QType.AAAA:
             self.rdata = AAAARecord(bb.read_plain(self.rdlength))
         elif self.qtype == QType.OPT:
@@ -371,8 +390,9 @@ class DnsMessage:
     def from_bytes(self, data: bytes):
         return self.from_buffer(ByteBuffer(data))
 
-    # NOTE: Build doesn't compress message using name compressions
     def build(self) -> bytes:
+        """Returns a valid DNS datagram encoded as bytes, ready for transmission with UDP
+        NOTE name compression scheme as defined in RFC1035 is not implemented"""
         message = self.header.build()
         for q in self.question:
             message += q.build()
@@ -393,7 +413,12 @@ class DnsMessage:
                   ar.qtype == QType.A and fqdn(ar.name) in ns_target}
         return result
 
+    def authority_ns(self):
+        """Returns names of nameservers in authority section of the message"""
+        return [str(auth.rdata) for auth in self.authority if auth.qtype == QType.NS]
+
     def answer_records(self, filter_by_type: QType):
+        """Returns readable representation for records in answer section filtered by QType"""
         answer_records = [str(ans.rdata) for ans in self.answer if ans.qtype == filter_by_type]
         return answer_records
 
