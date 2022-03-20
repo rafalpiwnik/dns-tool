@@ -91,7 +91,6 @@ def lookup(domain_name: str,
         response = DnsMessage().from_bytes(data)
         if verbose:
             response.print_concise_info()
-
         return response
     finally:
         sock.close()

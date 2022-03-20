@@ -221,8 +221,8 @@ class DnsResourceRecord:
     def readable_ttl(self):
         return str(timedelta(seconds=self.ttl))
 
-    def concise_info(self, name_pad: int = 20, secondary_just: int = 8) -> str:
-        name_just = max(name_pad, len(self.name) + secondary_just)
+    def concise_info(self, name_pad: int = 40, secondary_just: int = 8) -> str:
+        name_just = name_pad
         return f"{self.name}.".ljust(name_just) + str(self.ttl).rjust(secondary_just) + \
                self.qclass_name().rjust(secondary_just) + self.qtype.name.rjust(secondary_just) + \
                " " * secondary_just + str(self.rdata)
