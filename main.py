@@ -28,5 +28,5 @@ if __name__ == "__main__":
     # m7 = lookup("yahoo.com", "A", server_ip=yahoo_ns_ip, recursive=False)
     # print("FOUND " + str(m7.answer[0].rdata))
 
-    lookup("cs.berkeley.edu", "MX")
-    # recursive_resolve("yahoo.com")
+    # lookup("cs.berkeley.edu", "MX")
+    recursive_resolve("yahoo.com")

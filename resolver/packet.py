@@ -1,48 +1,12 @@
 import binascii
-import ipaddress
 
 from dataclasses import dataclass, field
 from datetime import timedelta
-from enum import Enum
 
 from typing import Union, Literal
 from resolver.buffer import ByteBuffer
+from resolver.record_type import RCode, QClass, QType, RData, RecordFactory
 from resolver.utility import to_qname, fqdn
-
-
-class QType(Enum):
-    UNKNOWN = 0
-    A = 1
-    NS = 2
-    MD = 3
-    MF = 4
-    CNAME = 5
-    SOA = 6
-    MB = 7
-    MR = 9
-    NULL = 10
-    WKS = 11
-    PTR = 12
-    HINFO = 13
-    MINFO = 14
-    MX = 15
-    TXT = 16
-    AAAA = 28
-    OPT = 41
-    RRSIG = 46
-
-
-class QClass(Enum):
-    IN = 1
-
-
-class RCode(Enum):
-    NO_ERROR = 0
-    FORMAT_ERROR = 1
-    SERVER_FAILURE = 2
-    NAME_ERROR = 3
-    NOT_IMPLEMENTED = 4
-    REFUSED = 5
 
 
 #   0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
@@ -174,66 +138,6 @@ class DnsQuestion:
                f"\tClass: {self.qclass.name}\n"
 
 
-@dataclass
-class RData:
-    """Base class for storing and interpreting different DNS RRs types
-    data MUST hold a hex stream, no other representation is valid"""
-    data: str  # Hex stream
-
-    def __repr__(self):
-        """Returns plain hex string representation of RDATA"""
-        return self.data
-
-    def __str__(self):
-        """Returns parsed RDATA. Subclasses are free to implement whatever parsing they wish
-        If no parsing mechanism is provided children fall back to parent implementation of __str__"""
-        return self.data
-
-
-class OPTRecord(RData):
-    """OPT pseudo record - no specialized parsing implementing due to brevity"""
-    pass
-
-
-class ARecord(RData):
-    def __str__(self):
-        addr = ipaddress.ip_address(
-            f"{int(self.data[:2], 16)}.{int(self.data[2:4], 16)}.{int(self.data[4:6], 16)}.{int(self.data[6:], 16)}")
-        return str(addr)
-
-
-class AAAARecord(RData):
-    def __str__(self):
-        raw_addr = ":".join((self.data[i:i + 4]) for i in range(0, len(self.data), 4))
-        addr = ipaddress.ip_address(raw_addr)
-        return str(addr)
-
-
-class NSRecord(RData):
-    name: str = "INVALID"
-
-    def __init__(self, bb: ByteBuffer, num_bytes: int):
-        """NS record is initialized by byte buffer as it has to read name which may have been compressed"""
-        self.data = bb.peek_plain(num_bytes)
-        self.name = bb.read_qname()
-
-    def __str__(self):
-        return self.name
-
-
-class MXRecord(RData):
-    mx_preference: int = 0
-    name: str = "INVALID"
-
-    def __init__(self, bb: ByteBuffer, num_bytes: int):
-        self.data = bb.peek_plain(num_bytes)
-        self.mx_preference = bb.read_uint16()
-        self.name = bb.read_qname()
-
-    def __str__(self):
-        return self.name
-
-
 # +------------+--------------+------------------------------+
 # | Field Name | Field Type   | Description                  |
 # +------------+--------------+------------------------------+
@@ -290,18 +194,7 @@ class DnsResourceRecord:
         self.ttl = bb.read_uint32()
         self.rdlength = bb.read_uint16()
 
-        if self.qtype == QType.A:
-            self.rdata = ARecord(bb.read_plain(self.rdlength))
-        elif self.qtype == QType.NS:
-            self.rdata = NSRecord(bb, num_bytes=self.rdlength)
-        elif self.qtype == QType.MX:
-            self.rdata = MXRecord(bb, num_bytes=self.rdlength)
-        elif self.qtype == QType.AAAA:
-            self.rdata = AAAARecord(bb.read_plain(self.rdlength))
-        elif self.qtype == QType.OPT:
-            self.rdata = OPTRecord(bb.read_plain(self.rdlength))
-        else:
-            self.rdata = RData(bb.read_plain(self.rdlength))
+        self.rdata = RecordFactory.get_record(self.qtype, self.qclass, bb, self.rdlength)
 
         return self
 
