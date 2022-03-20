@@ -27,7 +27,6 @@ from resolver.utility import to_qname, fqdn
 class DnsHeader:
     ID: int = int("0xaaaa", 16)
     response: bool = False
-    recursive: bool = False
     opcode: int = 0
     authoritative_answer: bool = False
     truncation: bool = False
@@ -282,9 +281,33 @@ class DnsMessage:
     def from_bytes(self, data: bytes):
         return self.from_buffer(ByteBuffer(data))
 
+    def add_question(self, q: DnsQuestion):
+        self.question.append(q)
+        self.header.qdcount += 1
+        return self
+
+    def add_resource_record(self, rr: DnsResourceRecord, section: Literal["answer", "authority", "additional"]):
+        if section == "answer":
+            self.answer.append(rr)
+            self.header.ancount += 1
+        elif section == "authority":
+            self.authority.append(rr)
+            self.header.nscount += 1
+        elif section == "additional":
+            self.additional.append(rr)
+            self.header.arcount += 1
+        else:
+            raise NotImplementedError
+        return self
+
+    def add_pseudo_record(self, udp_payload_size: int):
+        self.additional.append(DnsResourceRecord().pseudo_record(".", udp_payload_size))
+        self.header.arcount += 1
+        return self
+
     def build(self) -> str:
-        """Returns a valid DNS datagram encoded as bytes, ready for transmission with UDP
-        NOTE name compression scheme as defined in RFC1035 is not implemented"""
+        """Returns a DNS datagram encoded as hex string, ready for transmission with UDP
+        NOTE: name compression scheme as defined in RFC1035 is not implemented"""
         message = self.header.build()
         for q in self.question:
             message += q.build()
@@ -297,6 +320,7 @@ class DnsMessage:
         return message
 
     def build_bytes(self) -> bytes:
+        """Returns bytes representation of DNS datagram"""
         return binascii.unhexlify(self.build())
 
     def resolved_ns(self, target_section: Literal["answer", "authority"] = "authority"):
@@ -313,31 +337,27 @@ class DnsMessage:
         return [str(auth.rdata) for auth in self.authority if auth.qtype == QType.NS]
 
     def answer_records(self, filter_by_type: QType):
-        """Returns readable representation for records in answer section filtered by QType"""
+        """Returns readable RDATA representation for records in answer section filtered by QType"""
         answer_records = [str(ans.rdata) for ans in self.answer if ans.qtype == filter_by_type]
         return answer_records
 
     def print_concise_info(self, sections: set[str] = {'question', 'answer', 'authority', 'additional'}):
         print(self.header.concise_info())
-
         if "question" in sections:
             print("<<QUESTION>>")
             for q in self.question:
                 print(q.concise_info())
             print("")
-
         if "answer" in sections:
             print("<<ANSWER>>")
             for ans in self.answer:
                 print(ans.concise_info())
             print("")
-
         if "authority" in sections:
             print("<<AUTHORITY>>")
             for auth in self.authority:
                 print(auth.concise_info())
             print("")
-
         if "additional" in sections:
             print("<<ADDITIONAL>>")
             for ar in self.additional:

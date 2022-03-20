@@ -15,4 +15,4 @@ if __name__ == "__main__":
     if args.trace:
         resp = recursive_lookup(args.name, args.record_type)
     else:
-        resp = lookup(args.name, args.record_type, recursive=(not args.norecurse))
+        resp = lookup(args.name, args.record_type, server_ip=args.dns_server, recursive=(not args.norecurse))
