@@ -101,6 +101,7 @@ def create_query(domain_name: str, record_type: Union[str, QType], opt_size: Opt
         query_type = record_type
     else:
         try:
+            record_type = record_type.upper()
             query_type = QType[record_type]
         except KeyError:
             print(f"QType {record_type} not supported")
