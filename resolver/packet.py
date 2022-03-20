@@ -3,7 +3,7 @@ import binascii
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-from typing import Union, Literal
+from typing import Union, Literal, List
 from resolver.buffer import ByteBuffer
 from resolver.record_type import RCode, QClass, QType, RData, RecordFactory
 from resolver.utility import to_qname, fqdn

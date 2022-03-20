@@ -13,7 +13,7 @@ def recursive_lookup(domain_name: str, record_type: Union[QType, str] = QType.A)
     name, addr = random.choice(list(resolved_root_ns.items()))
 
     while True:
-        response = lookup(domain_name, record_type, server_ip=addr, recursive=False)
+        response = lookup(domain_name, record_type, server_ip=addr, recursive=False, verbose=False)
 
         # The name queried doesn't exist
         if response.header.response_code == RCode.NXDOMAIN:
@@ -21,7 +21,13 @@ def recursive_lookup(domain_name: str, record_type: Union[QType, str] = QType.A)
 
         # Found response in answer section
         if response.header.response_code == RCode.NO_ERROR and len(response.answer) > 0:
-            return response
+            # If CNAME is encountered it necessitates lookup to jump to given canonical name
+            # For now assumes no corresponding A records were supplied for CNAME and runs recursive query regardless
+            cname_records = response.answer_records(filter_by_type=QType.CNAME)
+            if cname_records:
+                return recursive_lookup(cname_records[0], record_type)
+            else:
+                return response
 
         # CASE I: Server responds with corresponding A records in additional section
         resolved_ns = response.resolved_ns()
