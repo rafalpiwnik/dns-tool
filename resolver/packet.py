@@ -215,6 +215,7 @@ class DnsResourceRecord:
         return self.qclass.value if isinstance(self.qclass, QClass) else self.qclass
 
     def qclass_name(self):
+        """QClass name or int value if is not an instance of QClass"""
         return self.qclass.name if isinstance(self.qclass, QClass) else str(self.qclass)
 
     def readable_ttl(self):
@@ -233,6 +234,7 @@ class DnsResourceRecord:
         return result
 
     def __str__(self):
+        """Verbose record description"""
         return f"\tName: {'.' if self.name == '' else self.name}\n" \
                f"\tType: {self.qtype.name}\n" \
                f"\tClass: {self.qclass_name()}\n" \
@@ -260,8 +262,8 @@ class DnsMessage:
     authority: list[DnsResourceRecord] = field(default_factory=list)
     additional: list[DnsResourceRecord] = field(default_factory=list)
 
-    # Throws ValueError when encountered unknown QType
     def from_buffer(self, bb: ByteBuffer):
+        """Returns a DnsMessage instance built from given ByteBuffer, Raises TypeError if encountered unhandled QType"""
         self.header = DnsHeader().from_buffer(bb)
         for _ in range(self.header.qdcount):
             q = DnsQuestion().from_buffer(bb)
@@ -279,14 +281,17 @@ class DnsMessage:
         return self
 
     def from_bytes(self, data: bytes):
+        """Creates DnsMessage instance by wrapping data into a ByteBuffer and processing it"""
         return self.from_buffer(ByteBuffer(data))
 
     def add_question(self, q: DnsQuestion):
+        """Adds a question to this DnsMessage and updates QDCOUNT in message header"""
         self.question.append(q)
         self.header.qdcount += 1
         return self
 
     def add_resource_record(self, rr: DnsResourceRecord, section: Literal["answer", "authority", "additional"]):
+        """Appends the specified DnsResourceRecord to a given section"""
         if section == "answer":
             self.answer.append(rr)
             self.header.ancount += 1
@@ -301,6 +306,7 @@ class DnsMessage:
         return self
 
     def add_pseudo_record(self, udp_payload_size: int):
+        """Appends OPT pseudo resource record with specified udp_payload_size"""
         self.additional.append(DnsResourceRecord().pseudo_record(".", udp_payload_size))
         self.header.arcount += 1
         return self
@@ -368,6 +374,7 @@ class DnsMessage:
         return f"DNS Message: {repr(self.header)}"
 
     def __str__(self):
+        """Verbose DnsMessage data"""
         result = str(self.header) + "\n"
         result += "Queries:\n"
         for quest in self.question:

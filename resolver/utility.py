@@ -3,7 +3,7 @@ import binascii
 
 def to_qname(domain_name: str):
     qname = ""
-    domain_name = domain_name.rstrip(".")  # Remove trailing '.'
+    domain_name = domain_name.strip(".")    # Remove trailing and leading '.'
 
     labels = domain_name.split(".")
     for label in labels:

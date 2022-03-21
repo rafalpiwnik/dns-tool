@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from argparse import ArgumentParser
 
 from resolver import recursive_lookup, lookup

@@ -5,10 +5,15 @@ from typing import Union, Optional
 
 from resolver.packet import DnsHeader, QType, DnsMessage, DnsQuestion, QClass, DnsResourceRecord, RCode
 
+BASE_DNS_SERVER_IP = "1.1.1.1"
+BASE_DNS_SERVER_LABEL = "Cloudflare"
+SOCKET_TIMEOUT = 2.0
+
 
 def recursive_lookup(domain_name: str, record_type: Union[QType, str] = QType.A, output: bool = True):
-    # Begin by choosing one of the root name servers - ask 1.1.1.1 for IPs of root name servers and choose one
-    root_ns = lookup(".", "NS", server_ip="1.1.1.1", recursive=False, verbose=False)
+    # Begin by choosing one of the root name servers - ask base DNS for IPs of root name servers and choose one
+    root_ns = lookup(".", "NS", server_ip=BASE_DNS_SERVER_IP, server_label=BASE_DNS_SERVER_LABEL,
+                     recursive=False, verbose=False)
     resolved_root_ns = root_ns.resolved_ns(target_section="answer")  # Assumes root NS will supply additional A records
     name, addr = random.choice(list(resolved_root_ns.items()))
 
@@ -16,7 +21,7 @@ def recursive_lookup(domain_name: str, record_type: Union[QType, str] = QType.A,
         root_ns.print_concise_info(sections={"answer"})
 
     while True:
-        response = lookup(domain_name, record_type, server_ip=addr, recursive=False, verbose=False)
+        response = lookup(domain_name, record_type, server_ip=addr, server_label=name, recursive=False, verbose=False)
 
         if output:
             if response.answer:
@@ -41,7 +46,7 @@ def recursive_lookup(domain_name: str, record_type: Union[QType, str] = QType.A,
         # CASE I: Server responds with corresponding A records in additional section
         resolved_ns = response.resolved_ns()
         if resolved_ns:
-            addr = random.choice(list(resolved_ns.values()))  # Get IPv4Address of random resolved NS
+            name, addr = random.choice(list(resolved_ns.items()))  # Get IPv4Address of random resolved NS
             continue
 
         # CASE II: No matching additional A records were supplied, therefore we need to ask the same addr for A of NS
@@ -63,10 +68,11 @@ def recursive_lookup(domain_name: str, record_type: Union[QType, str] = QType.A,
 def lookup(domain_name: str,
            record_type: Union[str, QType],
            server_ip: str = "1.1.1.1",
+           server_label: Optional[str] = None,
            recursive: bool = True,
            opt_size: Optional[int] = 4096,
            verbose: bool = True) -> Optional[DnsMessage]:
-    print(f"Querying {record_type} {domain_name} @{server_ip}...")
+    print(f"Querying {record_type} {domain_name} @{server_ip}{'(' + server_label + ')' if server_label else ''}...")
     server = (server_ip, 53)
 
     try:
@@ -76,6 +82,7 @@ def lookup(domain_name: str,
 
     msg.header.recursion_desired = recursive
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(SOCKET_TIMEOUT)
 
     try:
         sock.sendto(msg.build_bytes(), server)
@@ -84,6 +91,8 @@ def lookup(domain_name: str,
         if verbose:
             response.print_concise_info()
         return response
+    except socket.timeout:
+        print("\tThe request timed out")
     finally:
         sock.close()
 
